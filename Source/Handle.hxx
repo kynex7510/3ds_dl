@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-namespace ctr {
+namespace ctr_dl {
 constexpr static std::size_t MAX_PATH = 355u;
 constexpr static std::size_t MAX_DEPS = 32u;
 
@@ -22,6 +22,6 @@ struct DLHandle {
 DLHandle *findHandle(const char *name);
 DLHandle *createHandle(const char *path, const std::uint32_t flags);
 bool freeHandle(DLHandle *handle);
-} // namespace ctr
+} // namespace ctr_dl
 
 #endif /* _3DS_DL_HANDLE_HXX */

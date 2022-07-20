@@ -9,7 +9,7 @@
 #include <cstring>
 #include <limits>
 
-using namespace ctr;
+using namespace ctr_dl;
 
 // Types
 
@@ -52,11 +52,11 @@ static bool decrementRefCount(DLHandle &handle) {
 
 // Handle
 
-DLHandle *ctr::findHandle(const char *name) {
+DLHandle *ctr_dl::findHandle(const char *name) {
   DLHandle *found = nullptr;
 
   if (!name) {
-    ctr::setLastError(ctr::ERR_INVALID_PARAM);
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_PARAM);
     return nullptr;
   }
 
@@ -75,18 +75,18 @@ DLHandle *ctr::findHandle(const char *name) {
   // Increment the refcount.
   if (found) {
     if (!incrementRefCount(*found)) {
-      ctr::setLastError(ctr::ERR_REF_LIMIT);
+      ctr_dl::setLastError(ctr_dl::ERR_REF_LIMIT);
       found = nullptr;
     }
   } else {
-    ctr::setLastError(ctr::ERR_NOT_FOUND);
+    ctr_dl::setLastError(ctr_dl::ERR_NOT_FOUND);
   }
 
   g_Mtx.unlock();
   return found;
 }
 
-DLHandle *ctr::createHandle(const char *path, const std::uint32_t flags) {
+DLHandle *ctr_dl::createHandle(const char *path, const std::uint32_t flags) {
   DLHandle *handle = nullptr;
 
   g_Mtx.lock();
@@ -108,25 +108,25 @@ DLHandle *ctr::createHandle(const char *path, const std::uint32_t flags) {
     handle->flags = flags;
     handle->refc = 1u;
   } else {
-    ctr::setLastError(ctr::ERR_HANDLE_LIMIT);
+    ctr_dl::setLastError(ctr_dl::ERR_HANDLE_LIMIT);
   }
 
   g_Mtx.unlock();
   return handle;
 }
 
-bool ctr::freeHandle(DLHandle *handle) {
+bool ctr_dl::freeHandle(DLHandle *handle) {
   bool ret = true;
 
   if (!handle || !handle->base) {
-    ctr::setLastError(ctr::ERR_INVALID_PARAM);
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_PARAM);
     return false;
   }
 
   g_Mtx.lock();
   if (decrementRefCount(*handle)) {
     g_Mtx.unlock();
-    ret = ctr::unloadObject(*handle);
+    ret = ctr_dl::unloadObject(*handle);
     g_Mtx.lock();
     std::memset(handle, 0x00, sizeof(DLHandle));
   }
@@ -138,7 +138,7 @@ bool ctr::freeHandle(DLHandle *handle) {
 // API
 
 int dlclose(void *handle) {
-  return !ctr::freeHandle(reinterpret_cast<DLHandle *>(handle));
+  return !ctr_dl::freeHandle(reinterpret_cast<DLHandle *>(handle));
 }
 
 void *dlsym(void *handle, const char *symbol) {

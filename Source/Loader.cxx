@@ -4,13 +4,14 @@
 #include "ELF.hxx"
 #include "Error.hxx"
 #include "Loader.hxx"
-#include "dlfcn.h"
+#include "Relocs.hxx"
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
-using namespace ctr;
+using namespace ctr_dl;
 
 // Macros
 
@@ -67,7 +68,6 @@ static bool changePermission(const std::uintptr_t address,
 }
 
 static std::uintptr_t allocateAligned(const std::size_t size) {
-  // TODO: maybe we should use some SVC.
   if (auto p = std::aligned_alloc(PAGE_SIZE, size)) {
     std::memset(p, 0x00, size);
     return reinterpret_cast<std::uintptr_t>(p);
@@ -88,16 +88,72 @@ static bool checkFlags(const std::uint32_t flags) {
   return true;
 }
 
+static std::string getDepPath(const char *basePath, const char *name) {
+  std::string path(basePath);
+  auto pos = path.rfind('/');
+
+  if (pos != std::string::npos) {
+    path = path.substr(0, pos);
+    return path + name;
+  }
+
+  return {};
+}
+
+static bool loadDependencies(DLHandle &handle, const Elf32_Ehdr *header,
+                             const SymResolver resolver) {
+  std::uint32_t depCount = 0;
+  auto base = reinterpret_cast<std::uintptr_t>(header);
+  auto strtab = getELFDynEntry(header, DT_STRTAB);
+
+  if (!strtab) {
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_OBJECT);
+    return false;
+  }
+
+  auto depEntries = getELFDynEntries(header, DT_NEEDED);
+
+  if (depEntries.size() > ctr_dl::MAX_DEPS) {
+    ctr_dl::setLastError(ctr_dl::ERR_DEPS_LIMIT);
+    return false;
+  }
+
+  for (auto entry : depEntries) {
+    auto path = getDepPath(handle.path,
+                           reinterpret_cast<const char *>(
+                               base + strtab->d_un.d_ptr + entry->d_un.d_ptr));
+    auto depHandle = dlopen_ex(path.c_str(), resolver, RTLD_NOW);
+
+    if (!depHandle) {
+      ctr_dl::setLastError(ctr_dl::ERR_DEP_FAIL);
+      return false;
+    }
+
+    handle.deps[++depCount] = reinterpret_cast<std::uintptr_t>(depHandle);
+  }
+
+  return true;
+}
+
 static bool mapObject(DLHandle &handle, const std::uint8_t *buffer,
-                      const std::size_t size) {
+                      const std::size_t size, const SymResolver resolver) {
   auto header = reinterpret_cast<const Elf32_Ehdr *>(buffer);
 
-  if (!ctr::validateELF(header, size))
+  if (!ctr_dl::validateELF(header, size))
     return false;
+
+  // Load dependencies.
+  if (!loadDependencies(handle, header, resolver)) {
+    // References may be solved by the user.
+    if (!resolver) {
+      ctr_dl::unloadObject(handle);
+      return false;
+    }
+  }
 
   // Allocate space for load segments.
   std::size_t allocSize = 0u;
-  auto loadSegments = ctr::getELFSegments(header, PT_LOAD);
+  auto loadSegments = ctr_dl::getELFSegments(header, PT_LOAD);
 
   for (auto s : loadSegments) {
     if (s->p_memsz < s->p_filesz) {
@@ -112,14 +168,15 @@ static bool mapObject(DLHandle &handle, const std::uint8_t *buffer,
   }
 
   if (!allocSize) {
-    ctr::setLastError(ctr::ERR_INVALID_OBJECT);
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_OBJECT);
     return 0u;
   }
 
   handle.base = allocateAligned(allocSize);
 
   if (!handle.base) {
-    ctr::setLastError(ctr::ERR_MAP_ERROR);
+    ctr_dl::setLastError(ctr_dl::ERR_MAP_ERROR);
+    ctr_dl::unloadObject(handle);
     return false;
   }
 
@@ -129,15 +186,20 @@ static bool mapObject(DLHandle &handle, const std::uint8_t *buffer,
                 buffer + s->p_offset, s->p_filesz);
   }
 
-  // TODO: Relocations...
+  // Apply relocations.
+  if (!ctr_dl::handleRelocs(handle, header, resolver)) {
+    ctr_dl::setLastError(ctr_dl::ERR_RELOC_FAIL);
+    ctr_dl::unloadObject(handle);
+    return false;
+  }
 
   // Restore permissions.
   for (auto s : loadSegments) {
     if (!changePermission(handle.base + s->p_vaddr,
                           alignSize(s->p_memsz, s->p_align),
                           wrapPermission(s->p_flags))) {
-      ctr::setLastError(ctr::ERR_MAP_ERROR);
-      ctr::unloadObject(handle);
+      ctr_dl::setLastError(ctr_dl::ERR_MAP_ERROR);
+      ctr_dl::unloadObject(handle);
       return false;
     }
   }
@@ -172,17 +234,18 @@ static bool mapObject(DLHandle &handle, const std::uint8_t *buffer,
 
 // Loader
 
-DLHandle *ctr::openOrLoadObject(const char *name, const std::uint8_t *buffer,
-                                const std::size_t size,
-                                const std::uint32_t flags) {
+DLHandle *ctr_dl::openOrLoadObject(const char *name, const std::uint8_t *buffer,
+                                   const std::size_t size,
+                                   const SymResolver resolver,
+                                   const std::uint32_t flags) {
   // Check flags.
   if (!checkFlags(flags)) {
-    ctr::setLastError(ctr::ERR_INVALID_PARAM);
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_PARAM);
     return nullptr;
   }
 
   // Check if already loaded, and update flags.
-  if (auto handle = ctr::findHandle(name)) {
+  if (auto handle = ctr_dl::findHandle(name)) {
     handle->flags = flags;
     return handle;
   }
@@ -192,21 +255,44 @@ DLHandle *ctr::openOrLoadObject(const char *name, const std::uint8_t *buffer,
 
   // At this point we expect buffer and size to be defined.
   if (!buffer || !size) {
-    ctr::setLastError(ctr::ERR_INVALID_PARAM);
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_PARAM);
     return nullptr;
   }
 
   // Get handle.
-  auto handle = ctr::createHandle(name, flags);
+  auto handle = ctr_dl::createHandle(name, flags);
 
   if (handle) {
     // Map and initialize.
-    if (mapObject(*handle, buffer, size))
+    if (mapObject(*handle, buffer, size, resolver))
       return handle;
 
-    ctr::freeHandle(handle);
+    ctr_dl::freeHandle(handle);
     handle = nullptr;
   }
 
   return handle;
+}
+
+bool ctr_dl::unloadObject(DLHandle &handle) {
+  // Run finalizers.
+  if (handle.fini && handle.finiSize) {
+    auto finiArray = reinterpret_cast<Elf32_Addr *>(handle.fini);
+    for (auto i = 0u; i < handle.finiSize; ++i)
+      reinterpret_cast<void (*)()>(handle.base + finiArray[i])();
+  }
+
+  // Unmap segments.
+  std::free(reinterpret_cast<void *>(handle.base));
+
+  // Unload dependencies.
+  for (auto i = 0u; i < ctr_dl::MAX_DEPS; ++i) {
+    auto h = reinterpret_cast<DLHandle *>(handle.deps[i]);
+    if (h) {
+      if (!ctr_dl::freeHandle(h))
+        return false;
+    }
+  }
+
+  return true;
 }

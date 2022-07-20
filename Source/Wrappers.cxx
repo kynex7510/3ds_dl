@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 
-using namespace ctr;
+using namespace ctr_dl;
 
 // Helpers
 
@@ -46,28 +46,28 @@ static std::uint8_t *readBinary(const char *path, const size_t size) {
 
 // Wrappers
 
-void *dlopen(const char *filename, int flags) {
+void *dlopen(const char *filename, const int flags) {
   return dlopen_ex(filename, nullptr, flags);
 }
 
-void *dlopen_ex(const char *path, void *(*cb)(char const *symbol), int flags) {
+void *dlopen_ex(const char *path, const SymResolver resolver, const int flags) {
   std::uint8_t *buffer = nullptr;
   std::size_t fileSize = 0u;
 
   // No reason to support main handle by NULL.
   if (!path) {
-    ctr::setLastError(ctr::ERR_INVALID_PARAM);
+    ctr_dl::setLastError(ctr_dl::ERR_INVALID_PARAM);
     return nullptr;
   }
 
   // Validate path length.
-  if (std::strlen(path) > ctr::MAX_PATH) {
-    ctr::setLastError(ctr::ERR_BIG_PATH);
+  if (std::strlen(path) > ctr_dl::MAX_PATH) {
+    ctr_dl::setLastError(ctr_dl::ERR_BIG_PATH);
     return nullptr;
   }
 
   // Avoid reading if already open.
-  if (auto handle = ctr::findHandle(path)) {
+  if (auto handle = ctr_dl::findHandle(path)) {
     handle->flags = flags;
     return reinterpret_cast<void *>(handle);
   }
@@ -77,30 +77,30 @@ void *dlopen_ex(const char *path, void *(*cb)(char const *symbol), int flags) {
     fileSize = getFileSize(path);
 
     if (!fileSize) {
-      ctr::setLastError(ctr::ERR_READ_FAILED);
+      ctr_dl::setLastError(ctr_dl::ERR_READ_FAILED);
       return nullptr;
     }
 
     buffer = readBinary(path, fileSize);
 
     if (!buffer) {
-      ctr::setLastError(ctr::ERR_READ_FAILED);
+      ctr_dl::setLastError(ctr_dl::ERR_READ_FAILED);
       return nullptr;
     }
   }
 
-  auto ret = ctr::openOrLoadObject(path, buffer, fileSize, flags);
+  auto ret = ctr_dl::openOrLoadObject(path, buffer, fileSize, resolver, flags);
 
   std::free(reinterpret_cast<void *>(buffer));
   return reinterpret_cast<void *>(ret);
 }
 
-void *dlmap(const unsigned char *buffer, const size_t size, int flags) {
+void *dlmap(const unsigned char *buffer, const size_t size, const int flags) {
   return dlmap_ex(buffer, size, nullptr, flags);
 }
 
 void *dlmap_ex(const unsigned char *buffer, const size_t size,
-               void *(*cb)(char const *symbol), int flags) {
+               const SymResolver resolver, const int flags) {
   return reinterpret_cast<void *>(
-      ctr::openOrLoadObject(nullptr, buffer, size, flags));
+      ctr_dl::openOrLoadObject(nullptr, buffer, size, resolver, flags));
 }

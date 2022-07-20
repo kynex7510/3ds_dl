@@ -2,11 +2,13 @@
 #define _3DS_DL_LOADER_HXX
 
 #include "Handle.hxx"
+#include "dlfcn.h"
 
-namespace ctr {
+namespace ctr_dl {
 DLHandle *openOrLoadObject(const char *name, const std::uint8_t *buffer,
-                           const std::size_t size, const std::uint32_t flags);
+                           const std::size_t size, const SymResolver resolver,
+                           const std::uint32_t flags);
 bool unloadObject(DLHandle &handle);
-} // namespace ctr
+} // namespace ctr_dl
 
 #endif /* _3DS_DL_LOADER_HXX */

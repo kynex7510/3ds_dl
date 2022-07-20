@@ -12,6 +12,8 @@
 
 // Types
 
+typedef void *(*SymResolver)(const char *);
+
 typedef struct {
   // Object path name
   const char *dli_fname;
@@ -22,7 +24,7 @@ typedef struct {
   // Actual address of the symbol
   void *dli_saddr;
   // Extension: object entrypoint
-  void* dli_fep;
+  void *dli_fep;
 } Dl_info;
 
 // Standard API
@@ -40,7 +42,7 @@ extern "C" {
     the same and the reference counter will be incremented.
     Returns the handle on success, NULL on failure.
 */
-void *dlopen(const char *filename, int flags);
+void *dlopen(const char *filename, const int flags);
 
 /*
     Decrement the reference count of a previously loaded library.
@@ -74,24 +76,24 @@ const char *dlerror(void);
 
 /*
     This is like dlopen(), but it takes a callback as an additional
-    parameter, which can be used to resolve references. Unresolved
+    parameter, which can be used to resolve symbols. Unresolved
     dependencies won't cause an error, but the callback must provide
     a valid (ie. non-null) address for each unresolved reference.
 */
-void *dlopen_ex(const char *filename, void *(*cb)(char const *symbol),
-                int flags);
+void *dlopen_ex(const char *filename, const SymResolver resolver,
+                const int flags);
 
 /*
     This is like dlopen(), but a buffer is specified instead of the
     library path.
 */
-void *dlmap(const unsigned char *buffer, const size_t size, int flags);
+void *dlmap(const unsigned char *buffer, const size_t size, const int flags);
 
 /*
     This is a combination of dlopen_ex() and dlmap().
 */
 void *dlmap_ex(const unsigned char *buffer, const size_t size,
-               void *(*cb)(char const *symbol), int flags);
+               const SymResolver resolver, const int flags);
 
 #if defined(__cplusplus)
 }
