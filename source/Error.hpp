@@ -1,5 +1,5 @@
-#ifndef _3DS_DL_ERROR_HXX
-#define _3DS_DL_ERROR_HXX
+#ifndef _3DS_DL_ERROR_HPP
+#define _3DS_DL_ERROR_HPP
 
 #include <cstdint>
 
@@ -26,4 +26,4 @@ void resetLastError();
 const char *getErrorAsString(const std::size_t index);
 } // namespace ctr_dl
 
-#endif /* _3DS_DL_ERROR_HXX */
+#endif /* _3DS_DL_ERROR_HPP */

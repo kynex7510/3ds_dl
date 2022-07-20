@@ -1,10 +1,12 @@
+extern "C" {
 #include <3ds/result.h>
 #include <3ds/svc.h>
+}
 
-#include "ELF.hxx"
-#include "Error.hxx"
-#include "Loader.hxx"
-#include "Relocs.hxx"
+#include "ELF.hpp"
+#include "Error.hpp"
+#include "Loader.hpp"
+#include "Relocs.hpp"
 
 #include <algorithm>
 #include <cstdlib>

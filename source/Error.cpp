@@ -1,4 +1,4 @@
-#include "Error.hxx"
+#include "Error.hpp"
 #include "dlfcn.h"
 
 using namespace ctr_dl;

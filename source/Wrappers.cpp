@@ -1,9 +1,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "Error.hxx"
-#include "Handle.hxx"
-#include "Loader.hxx"
+#include "Error.hpp"
+#include "Handle.hpp"
+#include "Loader.hpp"
 #include "dlfcn.h"
 
 #include <cstdio>

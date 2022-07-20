@@ -1,4 +1,4 @@
-#include "Relocs.hxx"
+#include "Relocs.hpp"
 #include "dlfcn.h"
 
 using namespace ctr_dl;

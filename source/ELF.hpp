@@ -1,7 +1,7 @@
-#ifndef _3DS_DL_ELF_HXX
-#define _3DS_DL_ELF_HXX
+#ifndef _3DS_DL_ELF_HPP
+#define _3DS_DL_ELF_HPP
 
-#include "Error.hxx"
+#include "Error.hpp"
 #include <elf.h>
 #include <vector>
 
@@ -128,4 +128,4 @@ inline const char *getELFSymName(const Elf32_Ehdr *header,
 
 } // namespace ctr_dl
 
-#endif /* _3DS_DL_ELF_HXX */
+#endif /* _3DS_DL_ELF_HPP */

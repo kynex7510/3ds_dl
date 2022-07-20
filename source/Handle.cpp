@@ -1,8 +1,10 @@
+extern "C" {
 #include <3ds/synchronization.h>
+}
 
-#include "Error.hxx"
-#include "Handle.hxx"
-#include "Loader.hxx"
+#include "Error.hpp"
+#include "Handle.hpp"
+#include "Loader.hpp"
 #include "dlfcn.h"
 
 #include <algorithm>

@@ -1,7 +1,7 @@
-#ifndef _3DS_DL_LOADER_HXX
-#define _3DS_DL_LOADER_HXX
+#ifndef _3DS_DL_LOADER_HPP
+#define _3DS_DL_LOADER_HPP
 
-#include "Handle.hxx"
+#include "Handle.hpp"
 #include "dlfcn.h"
 
 namespace ctr_dl {
@@ -11,4 +11,4 @@ DLHandle *openOrLoadObject(const char *name, const std::uint8_t *buffer,
 bool unloadObject(DLHandle &handle);
 } // namespace ctr_dl
 
-#endif /* _3DS_DL_LOADER_HXX */
+#endif /* _3DS_DL_LOADER_HPP */

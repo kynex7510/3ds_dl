@@ -1,5 +1,5 @@
-#ifndef _3DS_DL_HANDLE_HXX
-#define _3DS_DL_HANDLE_HXX
+#ifndef _3DS_DL_HANDLE_HPP
+#define _3DS_DL_HANDLE_HPP
 
 #include <cstdint>
 
@@ -24,4 +24,4 @@ DLHandle *createHandle(const char *path, const std::uint32_t flags);
 bool freeHandle(DLHandle *handle);
 } // namespace ctr_dl
 
-#endif /* _3DS_DL_HANDLE_HXX */
+#endif /* _3DS_DL_HANDLE_HPP */
