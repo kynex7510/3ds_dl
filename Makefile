@@ -19,7 +19,7 @@ TARGET		:=	dl
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data
-INCLUDES	:=	include
+INCLUDES	:=	include internal
 
 #---------------------------------------------------------------------------------
 # options for code generation

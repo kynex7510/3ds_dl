@@ -1,4 +1,6 @@
-.vscode
 build
 lib
-test
+*.3dsx
+*.smdh
+*.elf
+*.so

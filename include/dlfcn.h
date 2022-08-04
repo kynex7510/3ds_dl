@@ -87,12 +87,12 @@ void *dlopen_ex(const char *filename, const SymResolver resolver,
     This is like dlopen(), but a buffer is specified instead of the
     library path.
 */
-void *dlmap(const unsigned char *buffer, const size_t size, const int flags);
+void *dlmap(const void *buffer, const size_t size, const int flags);
 
 /*
     This is a combination of dlopen_ex() and dlmap().
 */
-void *dlmap_ex(const unsigned char *buffer, const size_t size,
+void *dlmap_ex(const void *buffer, const size_t size,
                const SymResolver resolver, const int flags);
 
 #if defined(__cplusplus)
