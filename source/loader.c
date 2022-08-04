@@ -188,6 +188,7 @@ static int mapObject(struct DLHandle *handle, const void *buffer,
   if (!handle->origin) {
     ctrdl_setLastError(ERR_MAP_ERROR);
     ctrdl_unloadObject(handle);
+    free(loadSegments);
     return 0;
   }
 
@@ -202,6 +203,7 @@ static int mapObject(struct DLHandle *handle, const void *buffer,
   if (!handle->base) {
     ctrdl_setLastError(ERR_MAP_ERROR);
     ctrdl_unloadObject(handle);
+    free(loadSegments);
     return 0;
   }
 
@@ -209,6 +211,7 @@ static int mapObject(struct DLHandle *handle, const void *buffer,
   if (!ctrdl_handleRelocs(handle, header, resolver)) {
     ctrdl_setLastError(ERR_RELOC_FAIL);
     ctrdl_unloadObject(handle);
+    free(loadSegments);
     return 0;
   }
 
@@ -222,6 +225,7 @@ static int mapObject(struct DLHandle *handle, const void *buffer,
             wrapPermission(segment->p_flags)))) {
       ctrdl_setLastError(ERR_MAP_ERROR);
       ctrdl_unloadObject(handle);
+      free(loadSegments);
       return 0;
     }
   }
@@ -252,6 +256,7 @@ static int mapObject(struct DLHandle *handle, const void *buffer,
     handle->finiSize = finiEntrySize->d_un.d_val / sizeof(Elf32_Addr);
   }
 
+  free(loadSegments);
   return 1;
 }
 

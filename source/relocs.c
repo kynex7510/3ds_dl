@@ -22,7 +22,6 @@ struct RelEntry {
 
 static uintptr_t resolveSymbol(const struct RelContext *ctx,
                                const Elf32_Word index) {
-
   if (index == STN_UNDEF)
     return 0;
 
