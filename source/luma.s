@@ -5,10 +5,10 @@
 
 .type lumaFlushDataCacheRange, %function
 lumaFlushDataCacheRange:
-	svc 0x92
+	svc 0x91
 	bx lr
 
 .type lumaInvalidateInstructionCacheRange, %function
 lumaInvalidateInstructionCacheRange:
-	svc 0x94
+	svc 0x93
 	bx lr
