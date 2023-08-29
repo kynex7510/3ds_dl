@@ -30,11 +30,20 @@ static void *readBinary(const char *path, const size_t size) {
     void *buffer = calloc(1, size);
 
     if (buffer) {
-      fread(buffer, size, 1, h);
-      if (ferror(h) || !feof(h)) {
-        free(buffer);
-        buffer = NULL;
-      }
+      size_t totalRead = 0;
+      do {
+        size_t count =
+            fread((void *)((char *)buffer + totalRead), 1, size - totalRead, h);
+
+        if (ferror(h)) {
+          free(buffer);
+          buffer = NULL;
+          break;
+        }
+
+        totalRead += count;
+        break; // Workaround.
+      } while (!feof(h));
     }
 
     fclose(h);

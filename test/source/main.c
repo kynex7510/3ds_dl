@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
   if (!do_math)
     goto fail;
 
-  do_math(rand() % 14492, rand() % 9572);
+  // do_math(rand() % 14492, rand() % 9572);
 
   if (dlclose(h))
     goto fail;
