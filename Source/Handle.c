@@ -1,166 +1,130 @@
-#include <3ds/synchronization.h>
-
-#include "dlfcn.h"
-#include "Error.h"
 #include "Handle.h"
-#include "Init.h"
-#include "Loader.h"
+#include "Error.h"
 
-#include <limits.h>
 #include <string.h>
 
-#define MAX_HANDLES 16
+static CTRDLHandle g_Handles[CTRDL_MAX_HANDLES] = {};
+static RecursiveLock g_Mtx;
 
-// Globals
-
-static struct DLHandle g_Handles[MAX_HANDLES];
-static LightLock g_Mtx;
-
-// Helpers
-
-static int incrementRefCount(struct DLHandle *handle) {
-  if (handle->refc < UINT_MAX) {
-    ++handle->refc;
-    return 1;
-  }
-
-  return 0;
+// Returns true if the handle needs to be freed.
+static bool decrementRefCount(CTRDLHandle* handle) {
+    if (handle->refc)
+        --handle->refc;
+        
+    return !handle->refc;
 }
 
-static int decrementRefCount(struct DLHandle *handle) {
-  if (handle->refc)
-    --handle->refc;
+static void ctrdl_handleMtxLazyInit(void) {
+    static u8 initialized = 0;
 
-  return !handle->refc;
+    if (!__ldrexb(&initialized)) {
+        RecursiveLock_Init(&g_Mtx);
+
+        while (__strexb(&initialized, 1))
+            __ldrexb(&initialized);
+    } else {
+        __clrex();
+    }
 }
 
-// Handle
-
-void ctrdl_initHandleManager() {
-  memset(&g_Handles, 0x00, sizeof(struct DLHandle) * MAX_HANDLES);
-  LightLock_Init(&g_Mtx);
+void ctrdl_acquireHandleMtx(void) {
+    ctrdl_handleMtxLazyInit();
+    RecursiveLock_Lock(&g_Mtx);
 }
 
-struct DLHandle *ctrdl_findHandle(const char *name) {
-  struct DLHandle *found = NULL;
+void ctrdl_releaseHandleMtx(void) {
+    ctrdl_handleMtxLazyInit();
+    RecursiveLock_Unlock(&g_Mtx);
+}
 
-  if (!name) {
-    ctrdl_setLastError(ERR_INVALID_PARAM);
+CTRDLHandle* ctrdl_createHandle(const char* path, size_t flags) {
+    CTRDLHandle* handle = NULL;
+
+    const size_t pathSize = strlen(path);
+    if (pathSize > (CTRDL_PATHBUF_SIZE - 1)) {
+        ctrdl_setLastError(Err_LargePath);
+        return NULL;
+    }
+
+    ctrdl_acquireHandleMtx();
+
+    // Look for free handle.
+    for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
+        CTRDLHandle* h = ctrdl_getHandleByIndex(i);
+        if (!h->refc) {
+            handle = h;
+            break;
+        }
+    }
+
+    // Initialize the handle if we have found one.
+    if (handle) {
+        if (path) {
+            memcpy(handle->path, path, pathSize);
+            handle->path[pathSize] = '\0';
+        }
+
+        handle->flags = flags;
+        handle->refc = 1;
+    } else {
+        ctrdl_setLastError(Err_HandleLimit);
+    }
+
+    ctrdl_releaseHandleMtx();
+    return handle;
+}
+
+bool ctrdl_freeHandle(CTRDLHandle* handle) {
+    bool ret = true;
+
+    if (!handle) {
+        ctrdl_setLastError(Err_InvalidParam);
+        return false;
+    }
+
+    ctrdl_acquireHandleMtx();
+
+    if (decrementRefCount(handle)) {
+        ret = true; // TODO: ctrdl_unloadObject(handle);
+        if (ret) {
+            memset(handle, 0, sizeof(*handle));
+        }
+    }
+
+    ctrdl_releaseHandleMtx();
+    return ret;
+}
+
+CTRDLHandle* ctrdl_getHandleByIndex(size_t index) {
+    if (index < CTRDL_MAX_HANDLES)
+        return &g_Handles[index];
+
     return NULL;
-  }
+}
 
-  LightLock_Lock(&g_Mtx);
+CTRDLHandle* ctrdl_findHandleByName(const char* name) {
+    CTRDLHandle* found = NULL;
 
-  // Look for handle.
-  for (size_t i = 0; i < MAX_HANDLES; ++i) {
-    struct DLHandle *h = &g_Handles[i];
-
-    if (h->base && h->path[0] != 0x00 && strstr(h->path, name)) {
-      found = h;
-      break;
+    if (!name) {
+        ctrdl_setLastError(Err_InvalidParam);
+        return NULL;
     }
-  }
 
-  // Increment the refcount.
-  if (found) {
-    if (!incrementRefCount(found)) {
-      ctrdl_setLastError(ERR_REF_LIMIT);
-      found = NULL;
+    ctrdl_acquireHandleMtx();
+
+    // Look for handle.
+    for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
+        CTRDLHandle* h = ctrdl_getHandleByIndex(i);
+        if (h->refc && strstr(h->path, name)) {
+            ++h->refc;
+            found = h;
+            break;
+        }
     }
-  } else {
-    ctrdl_setLastError(ERR_NOT_FOUND);
-  }
 
-  LightLock_Unlock(&g_Mtx);
-  return found;
-}
+    if (!found)
+        ctrdl_setLastError(Err_NotFound);
 
-struct DLHandle *ctrdl_createHandle(const char *path, const uint32_t flags) {
-  struct DLHandle *handle = NULL;
-
-  LightLock_Lock(&g_Mtx);
-
-  // Look for free handle.
-  for (size_t i = 0; i < MAX_HANDLES; ++i) {
-    struct DLHandle *h = &g_Handles[i];
-
-    if (!h->base) {
-      handle = h;
-      break;
-    }
-  }
-
-  // If we have a handle, initialize it.
-  if (handle) {
-    if (path)
-      memcpy(handle->path, path, strlen(path));
-    handle->flags = flags;
-    handle->refc = 1u;
-  } else {
-    ctrdl_setLastError(ERR_HANDLE_LIMIT);
-  }
-
-  LightLock_Unlock(&g_Mtx);
-  return handle;
-}
-
-int ctrdl_freeHandle(struct DLHandle *handle) {
-  int ret = 1;
-
-  if (!handle) {
-    ctrdl_setLastError(ERR_INVALID_PARAM);
-    return 0;
-  }
-
-  LightLock_Lock(&g_Mtx);
-
-  if (decrementRefCount(handle)) {
-    LightLock_Unlock(&g_Mtx);
-    ret = ctrdl_unloadObject(handle);
-    LightLock_Lock(&g_Mtx);
-    memset(handle, 0x00, sizeof(struct DLHandle));
-  }
-
-  LightLock_Unlock(&g_Mtx);
-  return ret;
-}
-
-// API
-
-int dlclose(void *handle) {
-  if (ctrdl_isInit()) {
-    return !ctrdl_freeHandle((struct DLHandle *)handle);
-  }
-
-  return 1;
-}
-
-void *dlsym(void *handle, const char *symbol) {
-  return (void *)(((struct DLHandle *)(handle))->base + 0x7D8);
-}
-
-int dladdr(const void *addr, Dl_info *info) {
-  // We dont have to provide error infos for this function.
-  const uintptr_t address = (uintptr_t)(addr);
-
-  if (!ctrdl_isInit() || !info)
-    return 0;
-
-  LightLock_Lock(&g_Mtx);
-
-  // Look for object.
-  for (size_t i = 0; i < MAX_HANDLES; ++i) {
-    struct DLHandle *h = &g_Handles[i];
-    if (address >= h->base && address < (h->base + h->size)) {
-      info->dli_fname = h->path;
-      info->dli_fbase = (void *)(h->base);
-      info->dli_sname = NULL; // TODO: fill
-      info->dli_saddr = NULL; // TODO: fill
-      info->dli_fep = (void *)(h->ep);
-      break;
-    }
-  }
-
-  LightLock_Unlock(&g_Mtx);
-  return info->dli_fbase != NULL;
+    ctrdl_releaseHandleMtx();
+    return found;
 }

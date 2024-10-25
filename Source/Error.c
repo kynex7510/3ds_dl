@@ -21,8 +21,6 @@ const char* ctrdl_getErrorAsString(CTRDLError error) {
 			return "no memory";
 		case Err_HandleLimit:
 			return "hit the handle limit";
-		case Err_RefLimit:
-			return "hit the reference limit";
 		case Err_NotFound:
 			return "not found";
 		case Err_InvalidObject:
@@ -49,5 +47,3 @@ const char* ctrdl_getErrorAsString(CTRDLError error) {
 
 	return NULL;
 }
-
-const char *dlerror() { return ctrdl_getErrorAsString(ctrdl_getLastError()); }

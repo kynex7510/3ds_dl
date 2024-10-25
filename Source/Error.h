@@ -9,7 +9,6 @@ typedef enum {
     Err_ReadFailed,
     Err_NoMemory,
     Err_HandleLimit,
-    Err_RefLimit,
     Err_NotFound,
     Err_InvalidObject,
     Err_InvalidBit,
