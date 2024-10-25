@@ -1,10 +1,10 @@
 #include <3ds/synchronization.h>
 
 #include "dlfcn.h"
-#include "error.h"
-#include "handle.h"
-#include "init.h"
-#include "loader.h"
+#include "Error.h"
+#include "Handle.h"
+#include "Init.h"
+#include "Loader.h"
 
 #include <limits.h>
 #include <string.h>

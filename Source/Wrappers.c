@@ -2,10 +2,10 @@
 #include <unistd.h>
 
 #include "dlfcn.h"
-#include "error.h"
-#include "handle.h"
-#include "init.h"
-#include "loader.h"
+#include "Error.h"
+#include "Handle.h"
+#include "Init.h"
+#include "Loader.h"
 
 #include <stdio.h>
 #include <stdlib.h>

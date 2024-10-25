@@ -2,7 +2,7 @@
 #define _3DS_DL_LOADER_H
 
 #include "dlfcn.h"
-#include "handle.h"
+#include "Handle.h"
 
 struct DLHandle *ctrdl_openOrLoadObject(const char *name, const void *buffer,
                                         const size_t size,

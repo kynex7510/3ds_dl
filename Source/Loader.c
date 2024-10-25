@@ -1,8 +1,8 @@
-#include "loader.h"
-#include "allocator.h"
-#include "elfutil.h"
-#include "relocs.h"
-#include "system.h"
+#include "Loader.h"
+#include "Allocator.h"
+#include "ELFUtil.h"
+#include "Relocs.h"
+#include "System.h"
 
 #include <stdlib.h>
 

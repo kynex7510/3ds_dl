@@ -1,7 +1,7 @@
 #include <3ds/synchronization.h>
 
 #include "dlfcn.h"
-#include "error.h"
+#include "Error.h"
 
 // Globals
 

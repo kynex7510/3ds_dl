@@ -1,4 +1,5 @@
-build
+.vscode
+Build
 lib
 *.3dsx
 *.smdh

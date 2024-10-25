@@ -1,7 +1,7 @@
 #ifndef _3DS_DL_ELFUTIL_H
 #define _3DS_DL_ELFUTIL_H
 
-#include "error.h"
+#include "Error.h"
 #include <elf.h>
 #include <string.h>
 

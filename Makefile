@@ -16,10 +16,9 @@ include $(DEVKITARM)/3ds_rules
 # INCLUDES is a list of directories containing header files
 #---------------------------------------------------------------------------------
 TARGET		:=	dl
-BUILD		:=	build
-SOURCES		:=	source
-DATA		:=	data
-INCLUDES	:=	include internal
+BUILD		:=	Build
+SOURCES		:=	Source
+INCLUDES	:=	Include
 
 #---------------------------------------------------------------------------------
 # options for code generation

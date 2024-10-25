@@ -1,8 +1,8 @@
 #include <3ds/synchronization.h>
 
-#include "allocator.h"
-#include "handle.h"
-#include "init.h"
+#include "Allocator.h"
+#include "Handle.h"
+#include "Init.h"
 
 #include <stdint.h>
 

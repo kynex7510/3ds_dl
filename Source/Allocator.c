@@ -1,7 +1,7 @@
 #include <3ds/synchronization.h>
 
-#include "allocator.h"
-#include "system.h"
+#include "Allocator.h"
+#include "System.h"
 
 #include <stdlib.h>
 #include <string.h>

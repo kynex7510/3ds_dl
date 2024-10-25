@@ -2,8 +2,8 @@
 #define _3DS_DL_RELOCS_H
 
 #include "dlfcn.h"
-#include "elfutil.h"
-#include "handle.h"
+#include "ELFUtil.h"
+#include "Handle.h"
 
 int ctrdl_handleRelocs(const struct DLHandle *handle, const Elf32_Ehdr *header,
                        const SymResolver resolver);
