@@ -4,10 +4,8 @@
 #include <dlfcn.h>
 #include <stdio.h>
 
-typedef struct CTRDLStream;
-
-typedef bool(*CTRDLSeekFn)(CTRDLStream*, size_t offset);
-typedef bool(*CTRDLReadFn)(CTRDLStream*, void* out, size_t size);
+typedef bool(*CTRDLSeekFn)(void* stream, size_t offset);
+typedef bool(*CTRDLReadFn)(void* stream, void* out, size_t size);
 
 typedef struct {
     void* handle;     // Opaque handle.

@@ -79,7 +79,7 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
 
     // Read dyn entries.
     Elf32_Phdr dyn;
-    if (!ctrdl_getELFSegmentByType(out, &dyn, PT_DYNAMIC)) {
+    if (!ctrdl_getELFSegmentByType(out, PT_DYNAMIC, &dyn)) {
         ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
         return false;

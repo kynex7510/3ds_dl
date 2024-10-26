@@ -1,10 +1,11 @@
 #include "Stream.h"
 
-static bool ctrdl_fileSeekImpl(CTRDLStream* stream, size_t offset) {
-    return !fseek((FILE*)stream->handle, offset, SEEK_SET);
+static bool ctrdl_fileSeekImpl(void* stream, size_t offset) {
+    return !fseek((FILE*)((CTRDLStream*)stream)->handle, offset, SEEK_SET);
 }
 
-static bool ctrdl_fileReadImpl(CTRDLStream* stream, void* out, size_t size) {
+static bool ctrdl_fileReadImpl(void* s, void* out, size_t size) {
+    CTRDLStream* stream = (CTRDLStream*)s;
     FILE* f = (FILE*)stream->handle;
     size_t dataRead = 0;
 

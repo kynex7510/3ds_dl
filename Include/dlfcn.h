@@ -1,102 +1,44 @@
-#ifndef _3DS_DLFCN_H
-#define _3DS_DLFCN_H
+#ifndef _CTRDL_DLFCN_H
+#define _CTRDL_DLFCN_H
 
+#include <3ds.h>
 #include <sys/types.h>
-
-// Flags
 
 #define RTLD_LOCAL 0x0000
 #define RTLD_NOW 0x0002
 #define RTLD_NOLOAD 0x0004
 #define RTLD_GLOBAL 0x0100
 
-// Types
-
-typedef void *(*SymResolver)(const char *);
+typedef void*(*CTRDLSymResolver)(const char* path, void* userData);
 
 typedef struct {
-  // Object path name
-  const char *dli_fname;
-  // Object base address
-  void *dli_fbase;
-  // Symbol that overlap the address
-  const char *dli_sname;
-  // Actual address of the symbol
-  void *dli_saddr;
-  // Extension: object entrypoint
-  void *dli_fep;
+    const char* dli_fname; // Object path.
+    void* dli_fbase;       // Object base address.
+    const char* dli_sname; // Symbol which overlaps the address.
+    void* dli_saddr;       // Actual address for the symbol.
 } Dl_info;
 
-// Standard API
+typedef struct {
+    const char* path; // ObjectPath.
+    u32 base;         // Object base address.
+    size_t size;      // Object size.
+} CTRDLExtInfo;
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-/*
-    dlopen() loads the specified module and returns an opaque
-    handle referencing it. Parameter filename must be a non-null,
-    absolute path. Dependencies are searched in the same folder,
-    unless already loaded.
-    dlopen() may be called many times, the return value will be
-    the same and the reference counter will be incremented.
-    Returns the handle on success, NULL on failure.
-*/
-void *dlopen(const char *filename, const int flags);
+void* dlopen(const char* path, int flags);
+int dlclose(void* handle);
+void* dlsym(void* handle, const char* symbol);
+int dladdr(const void* addr, Dl_info* info);
+const char* dlerror(void);
 
-/*
-    Decrement the reference count of a previously loaded library.
-    When it reaches 0, the library is unloaded.
-    Returns 0 on success, nonzero on failure.
-*/
-int dlclose(void *handle);
-
-/*
-    Lookup the given symbol in the given library, and return its
-    address if found. Return NULL if not found. The value of the
-    symbol could effectively be NULL, so call dlerror() to check
-    whether the function failed.
-*/
-void *dlsym(void *handle, const char *symbol);
-
-/*
-    If the specified address is part of a library, returns various
-    informations about the library. On failure, returns 0.
-*/
-int dladdr(const void *addr, Dl_info *info);
-
-/*
-    When an error has occurred, dlerror() returns an human-readable
-    string describing the last error. The error is then cleared.
-    When no error, return NULL.
-*/
-const char *dlerror(void);
-
-// Extensions
-
-/*
-    This is like dlopen(), but it takes a callback as an additional
-    parameter, which can be used to resolve symbols. Unresolved
-    dependencies won't cause an error, but the callback must provide
-    a valid (ie. non-null) address for each unresolved reference.
-*/
-void *dlopen_ex(const char *filename, const SymResolver resolver,
-                const int flags);
-
-/*
-    This is like dlopen(), but a buffer is specified instead of the
-    library path.
-*/
-void *dlmap(const void *buffer, const size_t size, const int flags);
-
-/*
-    This is a combination of dlopen_ex() and dlmap().
-*/
-void *dlmap_ex(const void *buffer, const size_t size,
-               const SymResolver resolver, const int flags);
+void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* userData);
+bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info);
 
 #if defined(__cplusplus)
 }
 #endif
 
-#endif /* _3DS_DLFCN_H */
+#endif /* _CTRDL_DLFCN_H */
