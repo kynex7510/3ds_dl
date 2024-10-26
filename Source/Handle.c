@@ -1,5 +1,6 @@
 #include "Handle.h"
 #include "Error.h"
+#include "Loader.h"
 
 #include <string.h>
 
@@ -85,7 +86,7 @@ bool ctrdl_freeHandle(CTRDLHandle* handle) {
     ctrdl_acquireHandleMtx();
 
     if (decrementRefCount(handle)) {
-        ret = true; // TODO: ctrdl_unloadObject(handle);
+        ret = ctrdl_unloadObject(handle);
         if (ret) {
             memset(handle, 0, sizeof(*handle));
         }

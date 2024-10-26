@@ -1,6 +1,14 @@
-# 3ds_dl
+# CTRDL
 
-This library exposes a dl-like API for loading and executing ELF files on a 3DS.
+This library provides an implementation of common `dl*` APIs, which can be used for loading and executing ELF files on the Nintendo 3DS.
+
+## Build
+
+```
+mkdir Build
+cd Build
+$DEVKITPRO/devkitARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.cmake" ..
+```
 
 ## Limitations
 

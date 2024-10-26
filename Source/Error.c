@@ -4,12 +4,16 @@ static __thread size_t g_LastError = (size_t)Err_OK;
 
 CTRDLError ctrdl_getLastError(void) {
 	const CTRDLError error = (CTRDLError)g_LastError;
-	ctrdl_resetLastError();
+	ctrdl_clearLastError();
 	return error;
 }
 
-void ctrdl_setLastError(CTRDLError error) { g_LastError = (size_t)error; }
-void ctrdl_resetLastError(void) { ctrdl_setLastError(Err_OK); }
+void ctrdl_setLastError(CTRDLError error) {
+	if (g_LastError == Err_OK)
+		g_LastError = (size_t)error;
+}
+
+void ctrdl_clearLastError(void) { ctrdl_setLastError(Err_OK); }
 
 const char* ctrdl_getErrorAsString(CTRDLError error) {
 	switch (error) {
@@ -27,8 +31,8 @@ const char* ctrdl_getErrorAsString(CTRDLError error) {
 			return "invalid object";
 		case Err_InvalidBit:
 			return "the object is not 32-bit";
-		case Err_NotPIE:
-			return "the object is not position indipendent";
+		case Err_NotSO:
+			return "the object is not shared";
 		case Err_InvalidArch:
 			return "invalid architecture";
 		case Err_MapError:

@@ -12,7 +12,7 @@ typedef enum {
     Err_NotFound,
     Err_InvalidObject,
     Err_InvalidBit,
-    Err_NotPIE,
+    Err_NotSO,
     Err_InvalidArch,
     Err_MapError,
     Err_LargePath,
@@ -24,7 +24,7 @@ typedef enum {
 
 CTRDLError ctrdl_getLastError(void);
 void ctrdl_setLastError(CTRDLError error);
-void ctrdl_resetLastError(void);
+void ctrdl_clearLastError(void);
 const char* ctrdl_getErrorAsString(CTRDLError error);
 
 #endif /* _CTRDL_ERROR_H */
