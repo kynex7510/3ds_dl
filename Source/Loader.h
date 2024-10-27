@@ -1,13 +1,10 @@
-#ifndef _3DS_DL_LOADER_H
-#define _3DS_DL_LOADER_H
+#ifndef _CTRDL_LOADER_H
+#define _CTRDL_LOADER_H
 
-#include "dlfcn.h"
 #include "Handle.h"
+#include "Stream.h"
 
-struct DLHandle *ctrdl_openOrLoadObject(const char *name, const void *buffer,
-                                        const size_t size,
-                                        const SymResolver resolver,
-                                        const uint32_t flags);
-int ctrdl_unloadObject(struct DLHandle *handle);
+CTRDLHandle* ctrdl_loadObject(const char* name, int flags, CTRDLStream* stream, CTRDLSymResolver resolver, void* resolverUserData);
+bool ctrdl_unloadObject(CTRDLHandle* handle);
 
-#endif /* _3DS_DL_LOADER_H */
+#endif /* _CTRDL_LOADER_H */

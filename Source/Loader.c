@@ -1,338 +1,308 @@
+#include "CTRL/Memory.h"
+
 #include "Loader.h"
-#include "Allocator.h"
+#include "Handle.h"
 #include "ELFUtil.h"
 #include "Relocs.h"
-#include "System.h"
 
 #include <stdlib.h>
+#include <string.h>
 
-#define RTLD_LAZY 0x0001
-#define RTLD_DEEPBIND 0x0008
-#define RTLD_NODELETE 0x1000
+#define CODE_BASE 0x100000
+#define CODE_SIZE 0x3F00000
 
-#define MEMPERM_NONE (MemPerm)0
+typedef struct {
+    CTRDLHandle* handle;
+    CTRDLStream* stream;
+    CTRDLElf elf;
+    CTRDLSymResolver resolver;
+    void* resolverUserData;
+} LdrData;
 
-// Helpers
-
-static MemPerm wrapPermission(const Elf32_Word flags) {
-  switch (flags) {
-  case PF_R:
-    return MEMPERM_READ;
-  case PF_W:
-    return MEMPERM_WRITE;
-  case PF_X:
-    return MEMPERM_EXECUTE;
-  case PF_R | PF_W:
-    return MEMPERM_READWRITE;
-  case PF_R | PF_X:
-    return MEMPERM_READEXECUTE;
-  default:
-    return MEMPERM_NONE;
-  }
+static MemPerm ctrdl_wrapPerms(Elf32_Word flags) {
+    switch (flags) {
+        case PF_R:
+            return MEMPERM_READ;
+        case PF_W:
+            return MEMPERM_WRITE;
+        case PF_X:
+            return MEMPERM_EXECUTE;
+        case PF_R | PF_W:
+            return MEMPERM_READWRITE;
+        case PF_R | PF_X:
+            return MEMPERM_READEXECUTE;
+        default:
+            return (MemPerm)0;
+    }
 }
 
-static int checkFlags(const uint32_t flags) {
-  // Unsupported flags.
-  if ((flags & RTLD_LAZY) | (flags & RTLD_DEEPBIND) | (flags & RTLD_NODELETE))
-    return 0;
+static char* ctrdl_getDepPath(const char* basePath, const char* name) {
+    if (!basePath || !name)
+        return NULL;
 
-  // Required flags.
-  if (!(flags & RTLD_NOW))
-    return 0;
+    const size_t baseSize = strlen(basePath);
+    const size_t nameSize = strlen(name);
+    char* buffer = malloc(baseSize + nameSize);
+    if (buffer) {
+        memcpy(buffer, basePath, baseSize);
+        buffer[baseSize] = '\0';
 
-  return 1;
-}
-
-static size_t getSegmentsAllocSize(const struct DLHandle *handle,
-                                   const size_t numSegments,
-                                   Elf32_Phdr **loadSegments) {
-  size_t allocSize = 0;
-
-  for (size_t i = 0; i < numSegments; ++i) {
-    const Elf32_Phdr *segment = loadSegments[i];
-
-    if (segment->p_memsz < segment->p_filesz) {
-      allocSize = 0;
-      break;
+        char* delim = strrchr(buffer, '/');
+        if (delim) {
+            ++delim;
+            memcpy(delim, name, nameSize);
+            delim[nameSize] = '\0';
+        } else {
+            memcpy(buffer, name, nameSize);
+            buffer[nameSize] = '\0';
+        }
     }
 
-    if (segment->p_align > 1)
-      allocSize += ctrdl_alignSize(segment->p_memsz, segment->p_align);
-    else
-      allocSize += segment->p_memsz;
-  }
-
-  return allocSize;
+    return buffer;
 }
 
-static char *getDepPath(const char *basePath, const char *name) {
-  char *pos = strstr(basePath, "/");
-
-  if (pos && name) {
-    size_t baseSize = (uintptr_t)pos - (uintptr_t)basePath - 1;
-    size_t depPathSize = baseSize + strlen(name) + 1;
-    char *depPath = (char *)malloc(depPathSize);
-
-    if (depPath) {
-      memcpy(depPath, basePath, baseSize);
-      depPath[baseSize] = '\0';
-      strcat(depPath, name);
-      depPath[depPathSize] = '\0';
-      return depPath;
+static bool ctrdl_loadDeps(LdrData* ldrData) {
+    const size_t depCount = ctrdl_getELFNumDynEntriesWithTag(&ldrData->elf, DT_NEEDED);
+    if (depCount > CTRDL_MAX_DEPS) {
+        ctrdl_setLastError(Err_DepsLimit);
+        return false;
     }
-  }
 
-  return NULL;
+    Elf32_Dyn depEntries[CTRDL_MAX_DEPS];
+    const size_t actualDepCount = ctrdl_getELFDynEntriesWithTag(&ldrData->elf, DT_NEEDED, &depEntries, CTRDL_MAX_DEPS);
+    if (actualDepCount != depCount) {
+        ctrdl_setLastError(Err_DepFailed);
+        return false;
+    }
+
+    for (size_t i = 0; i < depCount; ++i) {
+        char* depPath = ctrdl_getDepPath(ldrData->handle->path, ldrData->elf.stringTable + depEntries[i].d_un.d_ptr);
+        // TODO: are symbols gonna be global or local?
+        void* depHandle = ctrdlOpen(depPath, RTLD_NOW, ldrData->resolver, ldrData->resolverUserData);
+        free(depPath);
+
+        if (!depHandle) {
+            ctrdl_setLastError(Err_DepFailed);
+            return false;
+        }
+
+        ldrData->handle->deps[i] = (CTRDLHandle*)depHandle;
+    }
+
+    return true;
 }
 
-static int loadDependencies(struct DLHandle *handle, const Elf32_Ehdr *header,
-                            const SymResolver resolver) {
-  Elf32_Dyn *depEntries[MAX_DEPS];
-  uintptr_t base = (uintptr_t)(header);
-  const Elf32_Dyn *strtab = ctrdl_getELFDynEntry(header, DT_STRTAB);
+static bool ctrdl_mapObject(LdrData* ldrData) {
+    CTRDLHandle* handle = ldrData->handle;
 
-  if (!strtab) {
-    ctrdl_setLastError(ERR_INVALID_OBJECT);
-    return 0;
-  }
+    // Load dependencies.
+    if (!ctrdl_loadDeps(ldrData)) {
+        // References may be resolved by the user.
+        if (!ldrData->resolver) {
+            ctrdl_unloadObject(handle);
+            return false;
+        }
 
-  size_t depCount = ctrdl_getElfDynSize(header, DT_NEEDED);
-
-  if (depCount > MAX_DEPS) {
-    ctrdl_setLastError(ERR_DEPS_LIMIT);
-    return 0;
-  }
-
-  size_t actualCount = ctrdl_getELFDynEntries(
-      header, DT_NEEDED, (Elf32_Dyn **)&depEntries, depCount);
-
-  if (actualCount != depCount) {
-    ctrdl_setLastError(ERR_DEP_FAIL);
-    return 0;
-  }
-
-  for (size_t i = 0; i < depCount; ++i) {
-    char *depPath =
-        getDepPath(handle->path, (const char *)(base + strtab->d_un.d_ptr +
-                                                depEntries[i]->d_un.d_ptr));
-    void *depHandle = dlopen_ex(depPath, resolver, RTLD_NOW);
-    free(depPath);
-
-    if (!depHandle) {
-      ctrdl_setLastError(ERR_DEP_FAIL);
-      return 0;
+        ctrdl_clearLastError();
     }
 
-    handle->deps[i] = (uintptr_t)(depHandle);
-  }
-
-  return true;
-}
-
-static int mapObject(struct DLHandle *handle, const void *buffer,
-                     const size_t size, const SymResolver resolver) {
-  const Elf32_Ehdr *header = (const Elf32_Ehdr *)(buffer);
-
-  if (!ctrdl_validateELF(header, size))
-    return 0;
-
-  // Load dependencies.
-  if (!loadDependencies(handle, header, resolver)) {
-    // References may be solved by the user.
-    if (!resolver) {
-      ctrdl_unloadObject(handle);
-      return 0;
+    // Calculate allocation space for load segments.
+    const size_t numSegments = ctrdl_getELFNumSegmentsByType(&ldrData->elf, PT_LOAD);
+    if (!numSegments) {
+        ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_unloadObject(handle);
+        return false;
     }
-  }
 
-  // Calculate allocation space for load segments.
-  size_t numSegments = ctrdl_getELFSegmentsSize(header, PT_LOAD);
+    Elf32_Phdr* loadSegments = malloc(numSegments *  sizeof(Elf32_Phdr));
+    if (!loadSegments) {
+        ctrdl_setLastError(Err_NoMemory);
+        ctrdl_unloadObject(handle);
+        return false;
+    }
 
-  if (!numSegments) {
-    ctrdl_setLastError(ERR_INVALID_OBJECT);
-    ctrdl_unloadObject(handle);
-    return 0;
-  }
+    const size_t actualNumSegments = ctrdl_getELFSegmentsByType(&ldrData->elf, PT_LOAD, loadSegments, numSegments);
+    if (actualNumSegments != numSegments) {
+        ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_unloadObject(handle);
+        free(loadSegments);
+        return false;
+    }
 
-  Elf32_Phdr **loadSegments =
-      (Elf32_Phdr **)(calloc(numSegments, sizeof(Elf32_Phdr *)));
+    for (size_t i = 0; i < numSegments; ++i) {
+        const Elf32_Phdr* segment = &loadSegments[i];
 
-  if (!loadSegments) {
-    ctrdl_setLastError(ERR_NO_MEMORY);
-    ctrdl_unloadObject(handle);
-    return 0;
-  }
+        if (segment->p_memsz < segment->p_filesz) {
+            ctrdl_setLastError(Err_InvalidObject);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
 
-  size_t actualNumSegments =
-      ctrdl_getELFSegments(header, PT_LOAD, loadSegments, numSegments);
+        if (segment->p_align > 1) {
+            handle->size += ctrlAlignSize(segment->p_memsz, segment->p_align);
+        } else {
+            handle->size += segment->p_memsz;
+        }
+    }
+    
+    // Allocate and map segments.
+    handle->origin = (u32)aligned_alloc(CTRL_PAGE_SIZE, handle->size);
+    if (!handle->origin) {
+        ctrdl_setLastError(Err_NoMemory);
+        ctrdl_unloadObject(handle);
+        free(loadSegments);
+        return false;
+    }
 
-  if (actualNumSegments != numSegments) {
-    ctrdl_setLastError(ERR_INVALID_OBJECT);
-    ctrdl_unloadObject(handle);
+    for (size_t i = 0; i < numSegments; ++i) {
+        const Elf32_Phdr* segment = &loadSegments[i];
+
+        if (!ldrData->stream->read(ldrData->stream, (void*)(handle->origin + segment->p_offset), segment->p_filesz)) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
+    }
+
+    MemInfo memInfo;
+    size_t processedSize = 0;
+    do {
+        if (R_FAILED(ctrlQueryRegion(CODE_BASE + processedSize, &memInfo))) {
+            ctrdl_setLastError(Err_MapFailed);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
+
+        if (memInfo.base_addr >= (CODE_BASE + CODE_SIZE)) {
+            ctrdl_setLastError(Err_NoMemory);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
+
+        processedSize += memInfo.size;
+    } while ((memInfo.state != MEMSTATE_FREE) || (memInfo.size < handle->size));
+
+    handle->base = CODE_BASE + processedSize;
+    if (R_FAILED(ctrlMirror(handle->base, handle->origin, handle->size))) {
+        ctrdl_setLastError(Err_MapFailed);
+        ctrdl_unloadObject(handle);
+        free(loadSegments);
+        return false;
+    }
+
+    // Apply relocations.
+    if (!ctrdl_handleRelocs(&ldrData->elf, ldrData->resolver, ldrData->resolverUserData)) {
+        ctrdl_setLastError(Err_RelocFailed);
+        ctrdl_unloadObject(handle);
+        free(loadSegments);
+        return false;
+    }
+
+    // Set correct permissions.
+    for (size_t i = 0; i < numSegments; ++i) {
+        const Elf32_Phdr* segment = &loadSegments[i];
+        const u32 base = handle->base + segment->p_vaddr;
+        const size_t alignedSize = ctrlAlignSize(segment->p_memsz, segment->p_align);
+        const MemPerm perms = ctrdl_wrapPerms(segment->p_flags);
+        
+        if (R_FAILED(ctrlChangePermission(base, alignedSize, perms))) {
+            ctrdl_setLastError(Err_MapFailed);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
+    }
+
     free(loadSegments);
-    return 0;
-  }
 
-  handle->size = getSegmentsAllocSize(handle, numSegments, loadSegments);
+    // Run initializers.
+    Elf32_Dyn initEntry;
+    const bool hasInitArr = ctrdl_getELFDynEntryWithTag(&ldrData->elf, DT_INIT_ARRAY, &initEntry);
 
-  if (!handle->size) {
-    ctrdl_setLastError(ERR_INVALID_OBJECT);
-    ctrdl_unloadObject(handle);
-    free(loadSegments);
-    return 0;
-  }
+    Elf32_Dyn initEntrySize;
+    const bool hasInitSz = ctrdl_getELFDynEntryWithTag(&ldrData->elf, DT_INIT_ARRAYSZ, &initEntrySize);
 
-  // Allocate and map segments.
-  handle->origin = ctrdl_allocateAligned(handle->size);
-
-  if (!handle->origin) {
-    ctrdl_setLastError(ERR_MAP_ERROR);
-    ctrdl_unloadObject(handle);
-    free(loadSegments);
-    return 0;
-  }
-
-  for (size_t i = 0; i < numSegments; ++i) {
-    const Elf32_Phdr *segment = loadSegments[i];
-    memcpy((void *)(handle->origin + segment->p_vaddr),
-           (void *)((uintptr_t)buffer + segment->p_offset), segment->p_filesz);
-  }
-
-  handle->base = ctrdl_allocateCode(handle->origin, handle->size);
-
-  if (!handle->base) {
-    ctrdl_setLastError(ERR_MAP_ERROR);
-    ctrdl_unloadObject(handle);
-    free(loadSegments);
-    return 0;
-  }
-
-  // Apply relocations.
-  if (!ctrdl_handleRelocs(handle, header, resolver)) {
-    ctrdl_setLastError(ERR_RELOC_FAIL);
-    ctrdl_unloadObject(handle);
-    free(loadSegments);
-    return 0;
-  }
-
-  // Set right permissions.
-  for (size_t i = 0; i < numSegments; ++i) {
-    const Elf32_Phdr *segment = loadSegments[i];
-
-    if (R_FAILED(ctrdl_changePermission(
-            CUR_PROCESS_HANDLE, handle->base + segment->p_vaddr,
-            ctrdl_alignSize(segment->p_memsz, segment->p_align),
-            wrapPermission(segment->p_flags)))) {
-      ctrdl_setLastError(ERR_MAP_ERROR);
-      ctrdl_unloadObject(handle);
-      free(loadSegments);
-      return 0;
+    if (hasInitArr && hasInitSz) {
+        const Elf32_Addr* initArray = (const Elf32_Addr*)(handle->base + initEntry.d_un.d_ptr);
+        const size_t numOfEntries = initEntrySize.d_un.d_val / sizeof(Elf32_Addr);
+        for (size_t i = 0; i < numOfEntries; ++i)
+            ((InitFiniFn)(initArray[i]))();
     }
-  }
 
-  // Run initializers.
-  const Elf32_Dyn *initEntry = ctrdl_getELFDynEntry(header, DT_INIT_ARRAY);
-  const Elf32_Dyn *initEntrySize =
-      ctrdl_getELFDynEntry(header, DT_INIT_ARRAYSZ);
+    // Fill fini data.
+    Elf32_Dyn finiEntry;
+    const bool hasFiniArr = ctrdl_getELFDynEntryWithTag(&ldrData->elf, DT_FINI_ARRAY, &finiEntry);
 
-  if (initEntry && initEntrySize) {
-    const Elf32_Addr *initArray =
-        (const Elf32_Addr *)(handle->base + initEntry->d_un.d_ptr);
-    const size_t initArraySize = initEntrySize->d_un.d_val / sizeof(Elf32_Addr);
+    Elf32_Dyn finiEntrySize;
+    const bool hasFiniSz = ctrdl_getELFDynEntryWithTag(&ldrData->elf, DT_FINI_ARRAYSZ, &finiEntrySize);
 
-    for (size_t i = 0; i < initArraySize; ++i)
-      ((void (*)())(initArray[i]))();
-  }
-
-  // Fill missing members.
-  handle->ep = handle->base + header->e_entry;
-
-  const Elf32_Dyn *finiEntry = ctrdl_getELFDynEntry(header, DT_FINI_ARRAY);
-  const Elf32_Dyn *finiEntrySize =
-      ctrdl_getELFDynEntry(header, DT_FINI_ARRAYSZ);
-
-  if (finiEntry && finiEntrySize) {
-    handle->fini = handle->base + finiEntry->d_un.d_ptr;
-    handle->finiSize = finiEntrySize->d_un.d_val / sizeof(Elf32_Addr);
-  }
-
-  free(loadSegments);
-  return 1;
+    if (hasFiniArr && hasFiniSz) {
+        handle->finiArray = (InitFiniFn*)(handle->base + finiEntry.d_un.d_ptr);
+        handle->numOfFiniEntries = finiEntrySize.d_un.d_val / sizeof(Elf32_Addr);
+    }
+    
+    return true;
 }
 
-// Loader
+CTRDLHandle* ctrdl_loadObject(const char* name, int flags, CTRDLStream* stream, CTRDLSymResolver resolver, void* resolverUserData) {
+    LdrData ldrData;
+    ldrData.handle = ctrdl_createHandle(name, flags);
+    if (!ldrData.handle)
+        return NULL;
 
-struct DLHandle *ctrdl_openOrLoadObject(const char *name, const void *buffer,
-                                        const size_t size,
-                                        const SymResolver resolver,
-                                        const uint32_t flags) {
-  // Check flags.
-  if (!checkFlags(flags)) {
-    ctrdl_setLastError(ERR_INVALID_PARAM);
-    return NULL;
-  }
+    if (!ctrdl_parseELF(stream, &ldrData.elf)) {
+        ctrdl_freeHandle(ldrData.handle);
+        return NULL;
+    }
 
-  // Check if already loaded, and update flags.
-  struct DLHandle *handle = ctrdl_findHandle(name);
-  if (handle) {
-    handle->flags = flags;
-    return handle;
-  }
+    ldrData.stream = stream;
+    ldrData.resolver = resolver;
+    ldrData.resolverUserData = resolverUserData;
+    if (!ctrdl_mapObject(&ldrData)) {
+        ctrdl_freeHandle(ldrData.handle);
+        ldrData.handle = NULL;
+    }
 
-  if (flags & RTLD_NOLOAD)
-    return NULL;
-
-  // At this point we expect buffer and size to be defined.
-  if (!buffer || !size) {
-    ctrdl_setLastError(ERR_INVALID_PARAM);
-    return NULL;
-  }
-
-  // Get handle.
-  handle = ctrdl_createHandle(name, flags);
-
-  if (handle) {
-    // Map and initialize.
-    if (mapObject(handle, buffer, size, resolver))
-      return handle;
-
-    ctrdl_freeHandle(handle);
-    handle = NULL;
-  }
-
-  return handle;
+    ctrdl_freeELF(&ldrData.elf);
+    return ldrData.handle;
 }
 
-int ctrdl_unloadObject(struct DLHandle *handle) {
-  // Run finalizers.
-  if (handle->fini && handle->finiSize) {
-    const Elf32_Addr *finiArray = (const Elf32_Addr *)(handle->fini);
-    for (size_t i = 0; i < handle->finiSize; ++i)
-      ((void (*)())(finiArray[i]))();
-  }
-
-  // Unmap segments.
-  if (handle->base) {
-    if (!ctrdl_freeCode(handle->base, handle->origin, handle->size)) {
-      ctrdl_setLastError(ERR_FREE_FAILED);
-      return 0;
+bool ctrdl_unloadObject(CTRDLHandle* handle) {
+    // Run finalizers.
+    if (handle->finiArray) {
+        for (size_t i = 0; i < handle->numOfFiniEntries; ++i)
+            handle->finiArray[i]();
     }
 
-    ctrdl_freeHeap(handle->origin);
+    // Unmap segments.
+    if (handle->base) {
+        if (!ctrlUnmirror(handle->base, handle->origin, handle->size)) {
+            ctrdl_setLastError(Err_FreeFailed);
+            return false;
+        }
 
-    handle->origin = 0;
-    handle->base = 0;
-    handle->size = 0;
-  }
-
-  // Unload dependencies.
-  for (size_t i = 0; i < MAX_DEPS; ++i) {
-    struct DLHandle *h = (struct DLHandle *)(handle->deps[i]);
-    if (h) {
-      if (!ctrdl_freeHandle(h))
-        return 0;
+        handle->base = 0;
     }
-  }
 
-  return 1;
+    if (handle->origin) {
+        free((void*)handle->origin);
+        handle->origin = 0;
+        handle->size = 0;
+    }
+
+    // Unload dependencies.
+    for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
+        CTRDLHandle* dep = &handle->deps[i];
+        if (dep) {
+            if (!ctrdl_freeHandle(dep))
+                return false;
+        }
+    }
+
+    // TODO: Sym buffers.
+    return true;
 }

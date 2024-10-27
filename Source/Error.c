@@ -35,7 +35,7 @@ const char* ctrdl_getErrorAsString(CTRDLError error) {
 			return "the object is not shared";
 		case Err_InvalidArch:
 			return "invalid architecture";
-		case Err_MapError:
+		case Err_MapFailed:
 			return "could not map object";
 		case Err_LargePath:
 			return "too large path";
