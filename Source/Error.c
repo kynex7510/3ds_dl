@@ -8,11 +8,7 @@ CTRDLError ctrdl_getLastError(void) {
 	return error;
 }
 
-void ctrdl_setLastError(CTRDLError error) {
-	if (g_LastError == Err_OK)
-		g_LastError = (size_t)error;
-}
-
+void ctrdl_setLastError(CTRDLError error) { g_LastError = (size_t)error; }
 void ctrdl_clearLastError(void) { ctrdl_setLastError(Err_OK); }
 
 const char* ctrdl_getErrorAsString(CTRDLError error) {
@@ -37,8 +33,6 @@ const char* ctrdl_getErrorAsString(CTRDLError error) {
 			return "invalid architecture";
 		case Err_MapFailed:
 			return "could not map object";
-		case Err_LargePath:
-			return "too large path";
 		case Err_RelocFailed:
 			return "relocation failed";
 		case Err_DepsLimit:

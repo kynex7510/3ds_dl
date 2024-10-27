@@ -65,7 +65,6 @@ int dladdr(const void* addr, Dl_info* info) {
 
     CTRDLHandle* h = ctrdlHandleByAddress((u32)addr);
     if (h) {
-        // TODO: lifetime?
         info->dli_fname = h->path;
         info->dli_fbase = (void*)h->base;
             
@@ -76,8 +75,6 @@ int dladdr(const void* addr, Dl_info* info) {
         ctrdl_unlockHandle(h);
     }
 
-    ctrdl_releaseHandleMtx();
-
     // We dont have to provide error values for this function.
     ctrdl_clearLastError();
     return info->dli_fbase != NULL;
@@ -87,12 +84,6 @@ void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* re
     // We don't support the NULL pseudo handle.
     if (!path || !ctrdl_checkFlags(flags)) {
         ctrdl_setLastError(Err_InvalidParam);
-        return NULL;
-    }
-
-    // Validate path length.
-    if (strlen(path) >= CTRDL_PATHBUF_SIZE) {
-        ctrdl_setLastError(Err_LargePath);
         return NULL;
     }
 
@@ -148,23 +139,29 @@ bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info) {
         return false;
     }
 
-    ctrdl_acquireHandleMtx();
+    CTRDLHandle* h = (CTRDLHandle*)handle;
+    ctrdl_lockHandle(h);
 
     bool err = false;
-    CTRDLHandle* h = (CTRDLHandle*)handle;
-    info->pathSize = strlen(h->path);
-    info->path = malloc(info->pathSize + 1);
-    if (info->path) {
-        memcpy(info->path, h->path, info->pathSize);
-        info->path[info->pathSize] = '\0';
-        info->base = h->base;
-        info->size = h->size;
+    if (h->path) {
+        info->pathSize = strlen(h->path);;
+        info->path = malloc(info->pathSize + 1);
+        if (info->path) {
+            memcpy(info->path, h->path, info->pathSize);
+            info->path[info->pathSize] = '\0';
+        } else {
+            ctrdl_setLastError(Err_NoMemory);
+            err = true;
+        }
     } else {
-        ctrdl_setLastError(Err_NoMemory);
-        err = true;
+        info->path = NULL;
+        info->pathSize = 0;
     }
 
-    ctrdl_releaseHandleMtx();
+    info->base = h->base;
+    info->size = h->size;
+
+    ctrdl_unlockHandle(h);
     return err;
 }
 

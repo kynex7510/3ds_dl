@@ -102,8 +102,6 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
             ctrdl_unloadObject(handle);
             return false;
         }
-
-        ctrdl_clearLastError();
     }
 
     // Calculate allocation space for load segments.

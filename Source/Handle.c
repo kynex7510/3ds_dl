@@ -2,6 +2,7 @@
 #include "Error.h"
 #include "Loader.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 static CTRDLHandle g_Handles[CTRDL_MAX_HANDLES] = {};
@@ -33,10 +34,15 @@ void ctrdl_releaseHandleMtx(void) {
 CTRDLHandle* ctrdl_createHandle(const char* path, size_t flags) {
     CTRDLHandle* handle = NULL;
 
-    const size_t pathSize = strlen(path);
-    if (pathSize > (CTRDL_PATHBUF_SIZE - 1)) {
-        ctrdl_setLastError(Err_LargePath);
-        return NULL;
+    size_t pathSize = 0;
+    char* pathCopy = NULL;
+    if (path) {
+        pathSize = strlen(path);
+        pathCopy = malloc(pathSize + 1);
+        if (!pathCopy) {
+            ctrdl_setLastError(Err_NoMemory);
+            return NULL;
+        }
     }
 
     ctrdl_acquireHandleMtx();
@@ -52,11 +58,12 @@ CTRDLHandle* ctrdl_createHandle(const char* path, size_t flags) {
 
     // Initialize the handle if we have found one.
     if (handle) {
-        if (path) {
-            memcpy(handle->path, path, pathSize);
-            handle->path[pathSize] = '\0';
+        if (pathCopy) {
+            memcpy(pathCopy, path, pathSize);
+            pathCopy[pathSize] = '\0';
         }
 
+        handle->path = pathCopy;
         handle->flags = flags;
         handle->refc = 1;
     } else {
@@ -86,8 +93,10 @@ bool ctrdl_unlockHandle(CTRDLHandle* handle) {
 
         if (!handle->refc) {
             ret = ctrdl_unloadObject(handle);
-            if (ret)
+            if (ret) {
+                free(handle->path);
                 memset(handle, 0, sizeof(*handle));
+            }
         }
 
         ctrdl_releaseHandleMtx();
@@ -109,10 +118,9 @@ CTRDLHandle* ctrdl_unsafeGetHandleByIndex(size_t index) {
 CTRDLHandle* ctrdl_unsafeFindHandleByName(const char* name) {
     CTRDLHandle* found = NULL;
 
-    // Look for handle.
     for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
         CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
-        if (h->refc && strstr(h->path, name)) {
+        if (h->refc && h->path && strstr(h->path, name)) {
             found = h;
             break;
         }

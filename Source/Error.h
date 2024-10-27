@@ -15,7 +15,6 @@ typedef enum {
     Err_NotSO,
     Err_InvalidArch,
     Err_MapFailed,
-    Err_LargePath,
     Err_RelocFailed,
     Err_DepsLimit,
     Err_DepFailed,
