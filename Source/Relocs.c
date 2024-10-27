@@ -114,6 +114,7 @@ static bool ctrdl_handleRela(RelContext* ctx) {
 
 bool ctrdl_handleRelocs(CTRDLHandle* handle, CTRDLElf* elf, CTRDLSymResolver resolver, void* resolverUserData) {
     RelContext ctx;
+    ctx.handle = handle;
     ctx.elf = elf;
     ctx.resolver = resolver;
     ctx.resolverUserData = resolverUserData;

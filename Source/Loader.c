@@ -69,7 +69,7 @@ static bool ctrdl_loadDeps(LdrData* ldrData) {
     }
 
     Elf32_Dyn depEntries[CTRDL_MAX_DEPS];
-    const size_t actualDepCount = ctrdl_getELFDynEntriesWithTag(&ldrData->elf, DT_NEEDED, &depEntries, CTRDL_MAX_DEPS);
+    const size_t actualDepCount = ctrdl_getELFDynEntriesWithTag(&ldrData->elf, DT_NEEDED, depEntries, CTRDL_MAX_DEPS);
     if (actualDepCount != depCount) {
         ctrdl_setLastError(Err_DepFailed);
         return false;
@@ -86,7 +86,7 @@ static bool ctrdl_loadDeps(LdrData* ldrData) {
             return false;
         }
 
-        ldrData->handle->deps[i] = (CTRDLHandle*)depHandle;
+        ldrData->handle->deps[i] = depHandle;
     }
 
     return true;
@@ -195,7 +195,7 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
     }
 
     // Apply relocations.
-    if (!ctrdl_handleRelocs(&ldrData->elf, ldrData->resolver, ldrData->resolverUserData)) {
+    if (!ctrdl_handleRelocs(handle, &ldrData->elf, ldrData->resolver, ldrData->resolverUserData)) {
         ctrdl_setLastError(Err_RelocFailed);
         ctrdl_unloadObject(handle);
         free(loadSegments);
@@ -297,7 +297,7 @@ bool ctrdl_unloadObject(CTRDLHandle* handle) {
 
     // Unload dependencies.
     for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
-        CTRDLHandle* dep = handle->deps[i];
+        CTRDLHandle* dep = (CTRDLHandle*)handle->deps[i];
         if (dep) {
             if (!ctrdl_freeHandle(dep))
                 return false;
