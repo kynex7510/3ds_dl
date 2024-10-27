@@ -280,6 +280,7 @@ bool ctrdl_unloadObject(CTRDLHandle* handle) {
 
     // Unmap segments.
     if (handle->base) {
+        // TODO: Maybe we need to make it RW.
         if (!ctrlUnmirror(handle->base, handle->origin, handle->size)) {
             ctrdl_setLastError(Err_FreeFailed);
             return false;
@@ -296,7 +297,7 @@ bool ctrdl_unloadObject(CTRDLHandle* handle) {
 
     // Unload dependencies.
     for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
-        CTRDLHandle* dep = &handle->deps[i];
+        CTRDLHandle* dep = handle->deps[i];
         if (dep) {
             if (!ctrdl_freeHandle(dep))
                 return false;

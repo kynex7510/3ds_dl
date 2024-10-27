@@ -9,7 +9,7 @@
 #define RTLD_NOLOAD 0x0004
 #define RTLD_GLOBAL 0x0100
 
-typedef void*(*CTRDLSymResolver)(const char* path, void* userData);
+typedef void*(*CTRDLSymResolver)(const char* sym, void* userData);
 
 typedef struct {
     const char* dli_fname; // Object path.
