@@ -130,7 +130,11 @@ void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* re
 void* ctrdlHandleByAddress(u32 addr) {
     ctrdl_acquireHandleMtx();
     CTRDLHandle* handle = ctrdl_unsafeFindHandleByAddr(addr);
-    ctrdl_lockHandle(handle);
+    if (handle) {
+        ctrdl_lockHandle(handle);
+    } else {
+        ctrdl_setLastError(Err_NotFound);
+    }
     ctrdl_releaseHandleMtx();
     return handle;
 }

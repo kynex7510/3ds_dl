@@ -109,11 +109,6 @@ CTRDLHandle* ctrdl_unsafeGetHandleByIndex(size_t index) {
 CTRDLHandle* ctrdl_unsafeFindHandleByName(const char* name) {
     CTRDLHandle* found = NULL;
 
-    if (!name) {
-        ctrdl_setLastError(Err_InvalidParam);
-        return NULL;
-    }
-
     // Look for handle.
     for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
         CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
@@ -122,9 +117,6 @@ CTRDLHandle* ctrdl_unsafeFindHandleByName(const char* name) {
             break;
         }
     }
-
-    if (!found)
-        ctrdl_setLastError(Err_NotFound);
 
     return found;
 }
@@ -139,9 +131,6 @@ CTRDLHandle* ctrdl_unsafeFindHandleByAddr(u32 addr) {
             break;
         }
     }
-
-    if (!found)
-        ctrdl_setLastError(Err_NotFound);
 
     return found;
 }
