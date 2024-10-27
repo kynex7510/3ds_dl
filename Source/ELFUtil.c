@@ -391,7 +391,10 @@ size_t ctrdl_getELFNumDynEntriesWithTag(CTRDLElf* elf, Elf32_Sword tag) {
     Elf32_Dyn* entry = elf->dynEntries;
 
     while (entry->d_tag != DT_NULL) {
-        ++count;
+        if (entry->d_tag == tag) {
+            ++count;
+        }
+
         ++entry;
     }
 

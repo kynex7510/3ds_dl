@@ -168,7 +168,7 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
 
     MemInfo memInfo;
     size_t processedSize = 0;
-    do {
+    while (true) {
         if (R_FAILED(ctrlQueryRegion(CODE_BASE + processedSize, &memInfo))) {
             ctrdl_setLastError(Err_MapFailed);
             ctrdl_unloadObject(handle);
@@ -183,8 +183,11 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
             return false;
         }
 
+        if ((memInfo.state == MEMSTATE_FREE) && (memInfo.size >= handle->size))
+            break;
+
         processedSize += memInfo.size;
-    } while ((memInfo.state != MEMSTATE_FREE) || (memInfo.size < handle->size));
+    };
 
     handle->base = CODE_BASE + processedSize;
     if (R_FAILED(ctrlMirror(handle->base, handle->origin, handle->size))) {
@@ -210,6 +213,13 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
         const MemPerm perms = ctrdl_wrapPerms(segment->p_flags);
         
         if (R_FAILED(ctrlChangePermission(base, alignedSize, perms))) {
+            ctrdl_setLastError(Err_MapFailed);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
+
+        if (R_FAILED(ctrlFlushCache(base, alignedSize, CTRL_ICACHE))) {
             ctrdl_setLastError(Err_MapFailed);
             ctrdl_unloadObject(handle);
             free(loadSegments);
