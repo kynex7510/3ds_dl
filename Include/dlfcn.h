@@ -19,9 +19,10 @@ typedef struct {
 } Dl_info;
 
 typedef struct {
-    const char* path; // ObjectPath.
-    u32 base;         // Object base address.
-    size_t size;      // Object size.
+    char* path;      // Path.
+    size_t pathSize; // Path size.
+    u32 base;        // Base address.
+    size_t size;     // Size.
 } CTRDLExtInfo;
 
 #if defined(__cplusplus)
@@ -35,7 +36,10 @@ int dladdr(const void* addr, Dl_info* info);
 const char* dlerror(void);
 
 void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* userData);
+void* ctrdlHandleByAddress(u32 addr);
+void* ctrdlThisHandle(void);
 bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info);
+void ctrdlFreeExtInfo(CTRDLExtInfo* info);
 
 #if defined(__cplusplus)
 }

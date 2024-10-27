@@ -233,7 +233,7 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
             ((InitFiniFn)(initArray[i]))();
     }
 
-    // Fill fini data.
+    // Fill additional data.
     Elf32_Dyn finiEntry;
     const bool hasFiniArr = ctrdl_getELFDynEntryWithTag(&ldrData->elf, DT_FINI_ARRAY, &finiEntry);
 
@@ -244,7 +244,16 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
         handle->finiArray = (InitFiniFn*)(handle->base + finiEntry.d_un.d_ptr);
         handle->numOfFiniEntries = finiEntrySize.d_un.d_val / sizeof(Elf32_Addr);
     }
-    
+
+    handle->numSymBuckets = ldrData->elf.numOfSymBuckets;
+    handle->symBuckets = ldrData->elf.symBuckets;
+    handle->symChains = ldrData->elf.symChains;
+    handle->symEntries = ldrData->elf.symEntries;
+    handle->stringTable = ldrData->elf.stringTable;
+    ldrData->elf.symBuckets = NULL;
+    ldrData->elf.symChains = NULL;
+    ldrData->elf.symEntries = NULL;
+    ldrData->elf.stringTable = NULL;
     return true;
 }
 
@@ -255,7 +264,7 @@ CTRDLHandle* ctrdl_loadObject(const char* name, int flags, CTRDLStream* stream, 
         return NULL;
 
     if (!ctrdl_parseELF(stream, &ldrData.elf)) {
-        ctrdl_freeHandle(ldrData.handle);
+        ctrdl_unlockHandle(ldrData.handle);
         return NULL;
     }
 
@@ -263,7 +272,7 @@ CTRDLHandle* ctrdl_loadObject(const char* name, int flags, CTRDLStream* stream, 
     ldrData.resolver = resolver;
     ldrData.resolverUserData = resolverUserData;
     if (!ctrdl_mapObject(&ldrData)) {
-        ctrdl_freeHandle(ldrData.handle);
+        ctrdl_unlockHandle(ldrData.handle);
         ldrData.handle = NULL;
     }
 
@@ -298,12 +307,13 @@ bool ctrdl_unloadObject(CTRDLHandle* handle) {
     // Unload dependencies.
     for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
         CTRDLHandle* dep = (CTRDLHandle*)handle->deps[i];
-        if (dep) {
-            if (!ctrdl_freeHandle(dep))
-                return false;
-        }
+        if (dep)
+            ctrdl_unlockHandle(dep);
     }
 
-    // TODO: Sym buffers.
+    free(handle->symBuckets);
+    free(handle->symChains);
+    free(handle->symEntries);
+    free(handle->stringTable);
     return true;
 }

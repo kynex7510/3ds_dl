@@ -13,4 +13,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC Include)
 target_compile_options(${PROJECT_NAME} PRIVATE -O3 -Wall -Wno-switch)
 target_link_libraries(${PROJECT_NAME} CTRL)
 
-# add_subdirectory(Tests)
+add_subdirectory(Tests)

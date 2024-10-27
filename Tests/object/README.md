@@ -1,1 +1,0 @@
-Compile with: `arm-none-eabi-gcc -fPIC -shared math.c -o math.so`

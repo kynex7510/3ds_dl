@@ -25,7 +25,7 @@ typedef struct {
     Elf32_Word* symBuckets;        // Symbol buckets.
     Elf32_Word* symChains;         // Symbol chains.
     Elf32_Sym* symEntries;         // Symbol entries.
-    const char* stringTable;       // String table.
+    char* stringTable;             // String table.
 } CTRDLHandle;
 
 void ctrdl_acquireHandleMtx(void);

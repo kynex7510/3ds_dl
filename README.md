@@ -14,6 +14,5 @@ $DEVKITPRO/devkitARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.c
 
 - RTLD_LAZY, RTLD_DEEPBIND, and RTLD_NODELETE are not supported;
 - NULL pseudo path for main process is not supported;
-- dlsym() is stubbed;
 - dladdr() never fills dli_sname nor dli_saddr;
 - Only a handful relocations are implemented.

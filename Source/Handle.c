@@ -67,27 +67,6 @@ CTRDLHandle* ctrdl_createHandle(const char* path, size_t flags) {
     return handle;
 }
 
-bool ctrdl_freeHandle(CTRDLHandle* handle) {
-    bool ret = true;
-
-    if (!handle) {
-        ctrdl_setLastError(Err_InvalidParam);
-        return false;
-    }
-
-    ctrdl_acquireHandleMtx();
-
-    if (ctrdl_decrementHandleRefc(handle)) {
-        ret = ctrdl_unloadObject(handle);
-        if (ret) {
-            memset(handle, 0, sizeof(*handle));
-        }
-    }
-
-    ctrdl_releaseHandleMtx();
-    return ret;
-}
-
 void ctrdl_lockHandle(CTRDLHandle* handle) {
     if (handle) {
         ctrdl_acquireHandleMtx();
@@ -139,7 +118,6 @@ CTRDLHandle* ctrdl_unsafeFindHandleByName(const char* name) {
     for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
         CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
         if (h->refc && strstr(h->path, name)) {
-            ++h->refc;
             found = h;
             break;
         }
@@ -157,7 +135,6 @@ CTRDLHandle* ctrdl_unsafeFindHandleByAddr(u32 addr) {
     for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
         CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
         if (h->refc && (addr >= h->base) && (addr <= (h->base + h->size))) {
-            ++h->refc;
             found = h;
             break;
         }

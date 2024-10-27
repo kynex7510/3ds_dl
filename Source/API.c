@@ -23,33 +23,62 @@ static bool ctrdl_checkFlags(int flags) {
 }
 
 void* dlopen(const char* path, int flags) { return ctrdlOpen(path, flags, NULL, NULL); }
-int dlclose(void* handle) { return !ctrdl_freeHandle((CTRDLHandle*)handle); }
 const char* dlerror(void) { return ctrdl_getErrorAsString(ctrdl_getLastError()); }
 
-// We dont have to provide error values for this function.
+int dlclose(void* handle) { return !ctrdl_unlockHandle((CTRDLHandle*)handle); }
+
+void* dlsym(void* handle, const char* symbol) {
+    if (!handle || !symbol) {
+        ctrdl_setLastError(Err_InvalidParam);
+        return NULL;
+    }
+
+    void* found = NULL;
+    CTRDLHandle* h = (CTRDLHandle*)handle;
+    ctrdl_lockHandle(h);
+
+    const Elf32_Word hash = ctrdl_getELFSymHash(symbol);
+    size_t chainIndex = h->symBuckets[hash % h->numSymBuckets];
+
+    while (chainIndex != STN_UNDEF) {
+        const Elf32_Sym* s = &h->symEntries[chainIndex];
+        const char* name = &h->stringTable[s->st_name];
+        if (!strcmp(name, symbol)) {
+            found = (void*)s->st_value;
+            break;
+        }
+
+        chainIndex = h->symChains[chainIndex];
+    }
+
+    if (!found)
+        ctrdl_setLastError(Err_NotFound);
+
+    ctrdl_unlockHandle(h);
+    return found;
+}
+
 int dladdr(const void* addr, Dl_info* info) {
     if (!info)
         return 0;
 
-    ctrdl_acquireHandleMtx();
-
-    // Look for object.
-    const u32 address = (u32)addr;
-    for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
-        CTRDLHandle* h = ctrdl_getHandleByIndex(i);
-        if ((address >= h->base) && (address <= (h->base + h->size))) {
-            info->dli_fname = h->path;
-            info->dli_fbase = (void*)h->base;
+    CTRDLHandle* h = ctrdlHandleByAddress((u32)addr);
+    if (h) {
+        // TODO: lifetime?
+        info->dli_fname = h->path;
+        info->dli_fbase = (void*)h->base;
             
-            // TODO
-            info->dli_sname = NULL;
-            info->dli_saddr = NULL;
+        // TODO
+        info->dli_sname = NULL;
+        info->dli_saddr = NULL;
 
-            break;
-        }
+        ctrdl_unlockHandle(h);
     }
 
     ctrdl_releaseHandleMtx();
+
+    // We dont have to provide error values for this function.
+    ctrdl_clearLastError();
     return info->dli_fbase != NULL;
 }
 
@@ -67,7 +96,11 @@ void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* re
     }
 
     // Avoid reading if already open.
-    CTRDLHandle* handle = ctrdl_findHandleByName(path);
+    ctrdl_acquireHandleMtx();
+    CTRDLHandle* handle = ctrdl_unsafeFindHandleByName(path);
+    ctrdl_lockHandle(handle);
+    ctrdl_releaseHandleMtx();
+
     if (handle) {
         // Update flags.
         handle->flags = flags;
@@ -94,6 +127,16 @@ void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* re
     return handle;
 }
 
+void* ctrdlHandleByAddress(u32 addr) {
+    ctrdl_acquireHandleMtx();
+    CTRDLHandle* handle = ctrdl_unsafeFindHandleByAddr(addr);
+    ctrdl_lockHandle(handle);
+    ctrdl_releaseHandleMtx();
+    return handle;
+}
+
+void* ctrdlThisHandle(void) { return ctrdlHandleByAddress((u32)__builtin_extract_return_addr(__builtin_return_address(0))); }
+
 bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info) {
     if (!handle || !info) {
         ctrdl_setLastError(Err_InvalidParam);
@@ -102,11 +145,25 @@ bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info) {
 
     ctrdl_acquireHandleMtx();
 
+    bool err = false;
     CTRDLHandle* h = (CTRDLHandle*)handle;
-    info->path = h->path;
-    info->base = h->base;
-    info->size = h->size;
+    info->pathSize = strlen(h->path);
+    info->path = malloc(info->pathSize + 1);
+    if (info->path) {
+        memcpy(info->path, h->path, info->pathSize);
+        info->path[info->pathSize] = '\0';
+        info->base = h->base;
+        info->size = h->size;
+    } else {
+        ctrdl_setLastError(Err_NoMemory);
+        err = true;
+    }
 
     ctrdl_releaseHandleMtx();
-    return true;
+    return err;
+}
+
+void ctrdlFreeExtInfo(CTRDLExtInfo* info) {
+    if (info)
+        free(info->path);
 }
