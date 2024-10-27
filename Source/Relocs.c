@@ -1,7 +1,7 @@
 #include "CTRL/Types.h"
 
 #include "Relocs.h"
-#include "dlfcn.h"
+#include "Symbol.h"
 
 typedef struct {
     CTRDLHandle* handle;
@@ -25,18 +25,36 @@ static u32 ctrdl_resolveSymbol(const RelContext* ctx, Elf32_Word index) {
 
     // If we have a resolver, use it first.
     if (ctx->resolver) {
-        void* addr = ctx->resolver(sym, ctx->resolverUserData);
+        u32 addr = (u32)ctx->resolver(sym, ctx->resolverUserData);
         if (addr)
-            return (u32)addr;
+            return addr;
     }
 
-    // Look in dependencies.
+    // Look into global objects.
+    u32 addr = NULL;
+    ctrdl_acquireHandleMtx();
+
+    for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
+        CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
+        if (h->refc && (h->flags & RTLD_GLOBAL)) {
+            addr = ctrdl_findSymbolValueInHandle(h, sym);
+            if (addr)
+                break;
+        }
+    }
+
+    ctrdl_releaseHandleMtx();
+
+    if (addr)
+        return addr;
+
+    // Look into dependencies.
     for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
         CTRDLHandle* dep = ctx->handle->deps[i];
-        if (dep) {
-            void* addr = dlsym(dep, sym);
+        if (dep && !(dep->flags & RTLD_GLOBAL)) {
+            addr = ctrdl_findSymbolValueInHandle(dep, sym);
             if (addr)
-                return (u32)addr;
+                return addr;
         }
     }
 
