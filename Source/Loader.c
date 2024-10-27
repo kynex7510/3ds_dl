@@ -15,7 +15,7 @@ typedef struct {
     CTRDLHandle* handle;
     CTRDLStream* stream;
     CTRDLElf elf;
-    CTRDLSymResolver resolver;
+    CTRDLResolverFn resolver;
     void* resolverUserData;
 } LdrData;
 
@@ -77,8 +77,7 @@ static bool ctrdl_loadDeps(LdrData* ldrData) {
 
     for (size_t i = 0; i < depCount; ++i) {
         char* depPath = ctrdl_getDepPath(ldrData->handle->path, ldrData->elf.stringTable + depEntries[i].d_un.d_ptr);
-        // TODO: are symbols gonna be global or local?
-        void* depHandle = ctrdlOpen(depPath, RTLD_NOW, ldrData->resolver, ldrData->resolverUserData);
+        void* depHandle = ctrdlOpen(depPath, RTLD_NOW | RTLD_LOCAL, ldrData->resolver, ldrData->resolverUserData);
         free(depPath);
 
         if (!depHandle) {
@@ -275,7 +274,7 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
     return true;
 }
 
-CTRDLHandle* ctrdl_loadObject(const char* name, int flags, CTRDLStream* stream, CTRDLSymResolver resolver, void* resolverUserData) {
+CTRDLHandle* ctrdl_loadObject(const char* name, int flags, CTRDLStream* stream, CTRDLResolverFn resolver, void* resolverUserData) {
     LdrData ldrData;
     ldrData.handle = ctrdl_createHandle(name, flags);
     if (!ldrData.handle)

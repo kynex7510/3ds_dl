@@ -9,7 +9,8 @@
 #define RTLD_NOLOAD 0x0004
 #define RTLD_GLOBAL 0x0100
 
-typedef void*(*CTRDLSymResolver)(const char* sym, void* userData);
+typedef void*(*CTRDLResolverFn)(const char* sym, void* userData);
+typedef void(CTRDLIterateFn)(void* handle);
 
 typedef struct {
     const char* dli_fname; // Object path.
@@ -23,7 +24,7 @@ typedef struct {
     size_t pathSize; // Path size.
     u32 base;        // Base address.
     size_t size;     // Size.
-} CTRDLExtInfo;
+} CTRDLInfo;
 
 #if defined(__cplusplus)
 extern "C" {
@@ -35,11 +36,12 @@ void* dlsym(void* handle, const char* symbol);
 int dladdr(const void* addr, Dl_info* info);
 const char* dlerror(void);
 
-void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* userData);
+void* ctrdlOpen(const char* path, int flags, CTRDLResolverFn resolver, void* userData);
 void* ctrdlHandleByAddress(u32 addr);
 void* ctrdlThisHandle(void);
-bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info);
-void ctrdlFreeExtInfo(CTRDLExtInfo* info);
+void ctrdlIterate(CTRDLIterateFn callback);
+bool ctrdlInfo(void* handle, CTRDLInfo* info);
+void ctrdlFreeInfo(CTRDLInfo* info);
 
 #if defined(__cplusplus)
 }

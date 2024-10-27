@@ -6,7 +6,7 @@
 typedef struct {
     CTRDLHandle* handle;
     CTRDLElf* elf;
-    CTRDLSymResolver resolver;
+    CTRDLResolverFn resolver;
     void* resolverUserData;
 } RelContext;
 
@@ -130,7 +130,7 @@ static bool ctrdl_handleRela(RelContext* ctx) {
     return true;
 }
 
-bool ctrdl_handleRelocs(CTRDLHandle* handle, CTRDLElf* elf, CTRDLSymResolver resolver, void* resolverUserData) {
+bool ctrdl_handleRelocs(CTRDLHandle* handle, CTRDLElf* elf, CTRDLResolverFn resolver, void* resolverUserData) {
     RelContext ctx;
     ctx.handle = handle;
     ctx.elf = elf;

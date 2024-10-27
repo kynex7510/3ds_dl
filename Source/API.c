@@ -62,7 +62,7 @@ int dladdr(const void* addr, Dl_info* info) {
     return info->dli_fbase != NULL;
 }
 
-void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* resolverUserData) {
+void* ctrdlOpen(const char* path, int flags, CTRDLResolverFn resolver, void* resolverUserData) {
     // We don't support the NULL pseudo handle.
     if (!path || !ctrdl_checkFlags(flags)) {
         ctrdl_setLastError(Err_InvalidParam);
@@ -115,7 +115,24 @@ void* ctrdlHandleByAddress(u32 addr) {
 
 void* ctrdlThisHandle(void) { return ctrdlHandleByAddress((u32)__builtin_extract_return_addr(__builtin_return_address(0))); }
 
-bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info) {
+void ctrdlIterate(CTRDLIterateFn callback) {
+    if (!callback) {
+        ctrdl_setLastError(Err_InvalidParam);
+        return;
+    }
+
+    ctrdl_acquireHandleMtx();
+
+    for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
+        CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
+        if (h->refc)
+            callback(h);
+    }
+
+    ctrdl_releaseHandleMtx();
+}
+
+bool ctrdlInfo(void* handle, CTRDLInfo* info) {
     if (!handle || !info) {
         ctrdl_setLastError(Err_InvalidParam);
         return false;
@@ -147,7 +164,7 @@ bool ctrdlExtInfo(void* handle, CTRDLExtInfo* info) {
     return err;
 }
 
-void ctrdlFreeExtInfo(CTRDLExtInfo* info) {
+void ctrdlFreeExtInfo(CTRDLInfo* info) {
     if (info)
         free(info->path);
 }
