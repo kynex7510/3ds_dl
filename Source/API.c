@@ -53,7 +53,7 @@ int dladdr(const void* addr, Dl_info* info) {
     return info->dli_fbase != NULL;
 }
 
-void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* userData) {
+void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* resolverUserData) {
     // We don't support the NULL pseudo handle.
     if (!path || !ctrdl_checkFlags(flags)) {
         ctrdl_setLastError(Err_InvalidParam);
@@ -88,7 +88,7 @@ void* ctrdlOpen(const char* path, int flags, CTRDLSymResolver resolver, void* us
 
     CTRDLStream stream;
     ctrdl_makeFileStream(&stream, f);
-    handle = ctrdl_loadObject(path, flags, &stream, resolver, userData);
+    handle = ctrdl_loadObject(path, flags, &stream, resolver, resolverUserData);
 
     fclose(f);
     return handle;

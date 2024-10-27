@@ -7,14 +7,15 @@ Elf32_Word ctrdl_getELFSymHash(const char* name) {
     Elf32_Word h = 0;
     Elf32_Word g = 0;
 
-    for (u8 c = (u8)*name; c; ++name) {
-        h = ((h << 4) + c);
+    while (*name) {
+        h = ((h << 4) + (u8)*name);
         g = h & 0xF0000000;
 
         if (g)
             h ^= g >> 24;
 
         h &= ~g;
+        ++name;
     }
 
     return h;
