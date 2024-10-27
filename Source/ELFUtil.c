@@ -71,8 +71,8 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
 
     for (size_t i = 0; i < out->header.e_phoff; ++i) {
         if (!stream->read(stream, &out->segments[i], sizeof(Elf32_Phdr))) {
-            ctrdl_freeELF(out);
             ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
             return false;
         }
     }
@@ -80,142 +80,266 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
     // Read dyn entries.
     Elf32_Phdr dyn;
     if (!ctrdl_getELFSegmentByType(out, PT_DYNAMIC, &dyn)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->seek(stream, dyn.p_offset)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     out->dynEntries = malloc(dyn.p_filesz);
     if (!out->dynEntries) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_NoMemory);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->read(stream, out->dynEntries, dyn.p_filesz)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     // Read sym hash table.
     Elf32_Dyn hash;
     if (!ctrdl_getELFDynEntryWithTag(out, DT_HASH, &hash)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->seek(stream, hash.d_un.d_ptr)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->read(stream, &out->numOfSymBuckets, sizeof(Elf32_Word))) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     Elf32_Word numChains;
     if (!stream->read(stream, &numChains, sizeof(Elf32_Word))) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     out->symBuckets = malloc(out->numOfSymBuckets * sizeof(Elf32_Word));
     if (!out->symBuckets) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_NoMemory);
+        ctrdl_freeELF(out);
         return false;
     }
 
     out->symChains = malloc(numChains * sizeof(Elf32_Word));
     if (!out->symChains) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_NoMemory);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->read(stream, out->symBuckets, out->numOfSymBuckets * sizeof(Elf32_Word))) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->read(stream, out->symChains, numChains * sizeof(Elf32_Word))) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     // Read sym entries.
     Elf32_Dyn symtab;
     if (!ctrdl_getELFDynEntryWithTag(out, DT_SYMTAB, &symtab)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->seek(stream, symtab.d_un.d_ptr)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     out->symEntries = malloc(numChains * sizeof(Elf32_Sym));
     if (!out->symEntries) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_NoMemory);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->read(stream, out->symEntries, numChains * sizeof(Elf32_Sym))) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     // Read string table.
     Elf32_Dyn strtab;
     if (!ctrdl_getELFDynEntryWithTag(out, DT_STRTAB, &strtab)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->seek(stream, strtab.d_un.d_ptr)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
     }
 
     Elf32_Dyn strsz;
     if (!ctrdl_getELFDynEntryWithTag(out, DT_STRSZ, &strsz)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_InvalidObject);
+        ctrdl_freeELF(out);
         return false;
     }
 
     out->stringTable = (char*)malloc(strsz.d_un.d_val);
     if (!out->stringTable) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_NoMemory);
+        ctrdl_freeELF(out);
         return false;
     }
 
     if (!stream->read(stream, &out->stringTable, strsz.d_un.d_val)) {
-        ctrdl_freeELF(out);
         ctrdl_setLastError(Err_ReadFailed);
+        ctrdl_freeELF(out);
         return false;
+    }
+
+    // Read reloc info.
+    Elf32_Dyn jmpRelArray;
+    Elf32_Dyn jmpRelSize;
+    Elf32_Dyn jmpRelType;
+    const bool hasJmpRelArray = ctrdl_getELFDynEntryWithTag(out, DT_JMPREL, &jmpRelArray);
+    const bool hasJmpRelSize = ctrdl_getELFDynEntryWithTag(out, DT_PLTRELSZ, &jmpRelSize);
+    const bool hasJmpRelType = ctrdl_getELFDynEntryWithTag(out, DT_PLTREL, &jmpRelType);
+    const bool hasJmpRel = hasJmpRelArray && hasJmpRelSize && hasJmpRelType;
+
+    size_t numActuallyJmpRel = 0;
+    if (hasJmpRel) {
+        switch (jmpRelType.d_un.d_val) {
+            case DT_REL:
+                numActuallyJmpRel = jmpRelSize.d_un.d_val / sizeof(Elf32_Rel);
+                out->relArraySize = numActuallyJmpRel;
+                out->relaArraySize = 0;
+                break;
+            case DT_RELA:
+                numActuallyJmpRel = jmpRelSize.d_un.d_val / sizeof(Elf32_Rela);
+                out->relArraySize = 0;
+                out->relaArraySize = numActuallyJmpRel;
+                break;
+            default:
+                ctrdl_setLastError(Err_InvalidObject);
+                ctrdl_freeELF(out);
+                return false;
+        }
+    }
+
+    Elf32_Dyn relArray;
+    Elf32_Dyn relSize;
+    Elf32_Dyn relEnt;
+    const bool hasRelArray = ctrdl_getELFDynEntryWithTag(out, DT_REL, &relArray);
+    const bool hasRelSize = ctrdl_getELFDynEntryWithTag(out, DT_RELSZ, &relSize);
+    const bool hasRelEnt = ctrdl_getELFDynEntryWithTag(out, DT_RELENT, &relEnt);
+    const bool hasRel = hasRelArray && hasRelSize && hasRelEnt;
+
+    size_t numActuallyRel = 0;
+    if (hasRel) {
+        numActuallyRel = (relSize.d_un.d_val / relEnt.d_un.d_val);
+        out->relArraySize += numActuallyRel;
+    }
+
+    if (out->relArraySize) {
+        out->relArray = malloc(out->relArraySize * sizeof(Elf32_Rel));
+        if (!out->relArray) {
+            ctrdl_setLastError(Err_NoMemory);
+            ctrdl_freeELF(out);
+            return false;
+        }
+
+        if (!stream->seek(stream, relArray.d_un.d_ptr)) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
+            return false;
+        }
+
+        if (!stream->read(stream, out->relArray, numActuallyRel * sizeof(Elf32_Rel))) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
+            return false;
+        }
+    }
+
+    Elf32_Dyn relaArray;
+    Elf32_Dyn relaSize;
+    Elf32_Dyn relaEnt;
+    const bool hasRelaArray = ctrdl_getELFDynEntryWithTag(out, DT_RELA, &relaArray);
+    const bool hasRelaSize = ctrdl_getELFDynEntryWithTag(out, DT_RELASZ, &relaSize);
+    const bool hasRelaEnt = ctrdl_getELFDynEntryWithTag(out, DT_RELAENT, &relaEnt);
+    const bool hasRela = hasRelaArray && hasRelaSize && hasRelaEnt;
+
+    size_t numActuallyRela = 0;
+    if (hasRela) {
+        numActuallyRela = (relaSize.d_un.d_val / relaEnt.d_un.d_val);
+        out->relaArraySize += numActuallyRela;
+    }
+
+    if (out->relaArraySize) {
+        out->relaArray = malloc(out->relaArraySize * sizeof(Elf32_Rela));
+        if (!out->relaArray) {
+            ctrdl_setLastError(Err_NoMemory);
+            ctrdl_freeELF(out);
+            return false;
+        }
+
+        if (!stream->seek(stream, relaArray.d_un.d_ptr)) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
+            return false;
+        }
+
+        if (!stream->read(stream, out->relaArray, numActuallyRela * sizeof(Elf32_Rela))) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
+            return false;
+        }
+    }
+
+    if (hasJmpRel) {
+        void* dst = NULL;
+        size_t toRead = 0;
+
+        if (jmpRelType.d_un.d_val == DT_REL) {
+            dst = out->relArray + numActuallyRel;
+            toRead = numActuallyJmpRel * sizeof(Elf32_Rel);
+        } else {
+            dst = out->relaArray + numActuallyRela;
+            toRead = numActuallyJmpRel * sizeof(Elf32_Rela);
+        }
+
+        if (!stream->seek(stream, jmpRelArray.d_un.d_ptr)) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
+            return false;
+        }
+
+        if (!stream->read(stream, dst, toRead)) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_freeELF(out);
+            return false;
+        }
     }
 
     return true;
@@ -227,6 +351,9 @@ void ctrdl_freeELF(CTRDLElf* elf) {
     free(elf->symBuckets);
     free(elf->symChains);
     free(elf->symEntries);
+    free(elf->stringTable);
+    free(elf->relArray);
+    free(elf->relaArray);
 }
 
 size_t ctrdl_getELFNumSegmentsByType(CTRDLElf* elf, Elf32_Word type) {

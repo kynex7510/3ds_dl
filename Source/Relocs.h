@@ -1,11 +1,9 @@
-#ifndef _3DS_DL_RELOCS_H
-#define _3DS_DL_RELOCS_H
+#ifndef _CTRDL_RELOCS_H
+#define _CTRDL_RELOCS_H
 
-#include "dlfcn.h"
 #include "ELFUtil.h"
 #include "Handle.h"
 
-int ctrdl_handleRelocs(const struct DLHandle *handle, const Elf32_Ehdr *header,
-                       const SymResolver resolver);
+bool ctrdl_handleRelocs(CTRDLElf* elf, CTRDLSymResolver resolver, void* resolverUserData);
 
-#endif /* _3DS_DL_RELOCS_H */
+#endif /* _CTRDL_RELOCS_H */
