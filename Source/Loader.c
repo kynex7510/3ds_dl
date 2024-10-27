@@ -158,7 +158,14 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
     for (size_t i = 0; i < numSegments; ++i) {
         const Elf32_Phdr* segment = &loadSegments[i];
 
-        if (!ldrData->stream->read(ldrData->stream, (void*)(handle->origin + segment->p_offset), segment->p_filesz)) {
+        if (!ldrData->stream->seek(ldrData->stream, segment->p_offset)) {
+            ctrdl_setLastError(Err_ReadFailed);
+            ctrdl_unloadObject(handle);
+            free(loadSegments);
+            return false;
+        }
+
+        if (!ldrData->stream->read(ldrData->stream, (void*)(handle->origin + segment->p_vaddr), segment->p_filesz)) {
             ctrdl_setLastError(Err_ReadFailed);
             ctrdl_unloadObject(handle);
             free(loadSegments);
@@ -299,8 +306,7 @@ bool ctrdl_unloadObject(CTRDLHandle* handle) {
 
     // Unmap segments.
     if (handle->base) {
-        // TODO: Maybe we need to make it RW.
-        if (!ctrlUnmirror(handle->base, handle->origin, handle->size)) {
+        if (R_FAILED(ctrlUnmirror(handle->base, handle->origin, handle->size))) {
             ctrdl_setLastError(Err_FreeFailed);
             return false;
         }

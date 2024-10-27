@@ -25,20 +25,24 @@ int main(int argc, char *argv[]) {
     
     srand(time(NULL));
 
+    printf("Loading library...\n");
     void* h = ctrdlOpen("sdmc:/Math.so", RTLD_NOW, resolver, NULL);
     if (!h)
         goto fail;
 
+    printf("Looking for symbol...\n");
     DoMathFn doMath = (DoMathFn)dlsym(h, "doMath");
     if (!doMath)
         goto fail;
 
     printf("Address of doMath(): 0x%08x\n", doMath);  
-    //doMath(rand() % 14492, rand() % 9572);
+    doMath(rand() % 14492, rand() % 9572);
 
+    printf("Unloading library...\n");
     if (dlclose(h))
         goto fail;
 
+    printf("Success!\n");
     goto end;
 
 fail:

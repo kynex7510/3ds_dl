@@ -44,7 +44,8 @@ void* dlsym(void* handle, const char* symbol) {
         const Elf32_Sym* s = &h->symEntries[chainIndex];
         const char* name = &h->stringTable[s->st_name];
         if (!strcmp(name, symbol)) {
-            found = (void*)s->st_value;
+            // TODO: do we ever get a non VA?
+            found = (void*)(h->base + s->st_value);
             break;
         }
 
