@@ -218,20 +218,20 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
         const u32 base = handle->base + segment->p_vaddr;
         const size_t alignedSize = ctrlAlignSize(segment->p_memsz, segment->p_align);
         const MemPerm perms = ctrdl_wrapPerms(segment->p_flags);
-        
-        if (R_FAILED(ctrlChangePermission(base, alignedSize, perms))) {
-            ctrdl_setLastError(Err_MapFailed);
-            ctrdl_unloadObject(handle);
-            free(loadSegments);
-            return false;
-        }
 
-        if (R_FAILED(ctrlFlushCache(base, alignedSize, CTRL_ICACHE))) {
+        if (R_FAILED(ctrlChangePerms(base, alignedSize, perms))) {
             ctrdl_setLastError(Err_MapFailed);
             ctrdl_unloadObject(handle);
             free(loadSegments);
             return false;
         }
+    }
+
+    if (R_FAILED(ctrlFlushCache(CTRL_ICACHE | CTRL_DCACHE))) {
+        ctrdl_setLastError(Err_MapFailed);
+        ctrdl_unloadObject(handle);
+        free(loadSegments);
+        return false;
     }
 
     free(loadSegments);
