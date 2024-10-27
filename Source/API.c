@@ -1,6 +1,7 @@
 #include "Handle.h"
 #include "Error.h"
 #include "Loader.h"
+#include "Symbol.h"
 
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -33,30 +34,11 @@ void* dlsym(void* handle, const char* symbol) {
         return NULL;
     }
 
-    void* found = NULL;
-    CTRDLHandle* h = (CTRDLHandle*)handle;
-    ctrdl_lockHandle(h);
-
-    const Elf32_Word hash = ctrdl_getELFSymHash(symbol);
-    size_t chainIndex = h->symBuckets[hash % h->numSymBuckets];
-
-    while (chainIndex != STN_UNDEF) {
-        const Elf32_Sym* s = &h->symEntries[chainIndex];
-        const char* name = &h->stringTable[s->st_name];
-        if (!strcmp(name, symbol)) {
-            // TODO: do we ever get a non VA?
-            found = (void*)(h->base + s->st_value);
-            break;
-        }
-
-        chainIndex = h->symChains[chainIndex];
-    }
-
-    if (!found)
+    u32 addr = ctrdl_findSymbolValue((CTRDLHandle*)handle, symbol);
+    if (!addr)
         ctrdl_setLastError(Err_NotFound);
 
-    ctrdl_unlockHandle(h);
-    return found;
+    return (void*)addr;
 }
 
 int dladdr(const void* addr, Dl_info* info) {

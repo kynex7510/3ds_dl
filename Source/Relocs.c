@@ -31,7 +31,7 @@ static u32 ctrdl_resolveSymbol(const RelContext* ctx, Elf32_Word index) {
     }
 
     // Look into global objects.
-    u32 addr = NULL;
+    u32 addr = 0;
     ctrdl_acquireHandleMtx();
 
     for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
