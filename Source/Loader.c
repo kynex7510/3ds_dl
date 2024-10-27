@@ -145,6 +145,8 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
             handle->size += segment->p_memsz;
         }
     }
+
+    handle->size = ctrlAlignSize(handle->size, CTRL_PAGE_SIZE);
     
     // Allocate and map segments.
     handle->origin = (u32)aligned_alloc(CTRL_PAGE_SIZE, handle->size);
@@ -173,10 +175,11 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
         }
     }
 
-    MemInfo memInfo;
     size_t processedSize = 0;
+    MemInfo memInfo;
+    memInfo.base_addr = CODE_BASE;
     while (true) {
-        if (R_FAILED(ctrlQueryRegion(CODE_BASE + processedSize, &memInfo))) {
+        if (R_FAILED(ctrlQueryRegion(memInfo.base_addr + processedSize, &memInfo))) {
             ctrdl_setLastError(Err_MapFailed);
             ctrdl_unloadObject(handle);
             free(loadSegments);
@@ -196,7 +199,7 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
         processedSize += memInfo.size;
     };
 
-    handle->base = CODE_BASE + processedSize;
+    handle->base = memInfo.base_addr;
     if (R_FAILED(ctrlMirror(handle->base, handle->origin, handle->size))) {
         ctrdl_setLastError(Err_MapFailed);
         ctrdl_unloadObject(handle);
