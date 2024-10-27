@@ -206,14 +206,14 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
         return false;
     }
 
-    out->stringTable = (char*)malloc(strsz.d_un.d_val);
+    out->stringTable = malloc(strsz.d_un.d_val);
     if (!out->stringTable) {
         ctrdl_setLastError(Err_NoMemory);
         ctrdl_freeELF(out);
         return false;
     }
 
-    if (!stream->read(stream, &out->stringTable, strsz.d_un.d_val)) {
+    if (!stream->read(stream, out->stringTable, strsz.d_un.d_val)) {
         ctrdl_setLastError(Err_ReadFailed);
         ctrdl_freeELF(out);
         return false;
