@@ -107,6 +107,28 @@ void* ctrdlOpen(const char* path, int flags, CTRDLResolverFn resolver, void* res
     return handle;
 }
 
+void* ctrdlFOpen(FILE* f, int flags, CTRDLResolverFn resolver, void* resolverUserData) {
+    if (!f || !ctrdl_checkFlags(flags)) {
+        ctrdl_setLastError(Err_InvalidParam);
+        return NULL;
+    }
+
+    CTRDLStream stream;
+    ctrdl_makeFileStream(&stream, f);
+    return ctrdl_loadObject(NULL, flags, &stream, resolver, resolverUserData);
+}
+
+void* ctrdlMap(const void* buffer, size_t size, int flags, CTRDLResolverFn resolver, void* resolverUserData) {
+    if (!buffer || !size || !ctrdl_checkFlags(flags)) {
+        ctrdl_setLastError(Err_InvalidParam);
+        return NULL;
+    }
+
+    CTRDLStream stream;
+    ctrdl_makeMemStream(&stream, buffer, size);
+    return ctrdl_loadObject(NULL, flags, &stream, resolver, resolverUserData);
+}
+
 void* ctrdlHandleByAddress(u32 addr) {
     ctrdl_acquireHandleMtx();
     CTRDLHandle* handle = ctrdl_unsafeFindHandleByAddr(addr);

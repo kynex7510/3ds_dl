@@ -1,5 +1,7 @@
 #include "Stream.h"
 
+#include <string.h>
+
 static bool ctrdl_fileSeekImpl(void* stream, size_t offset) {
     return !fseek((FILE*)((CTRDLStream*)stream)->handle, offset, SEEK_SET);
 }
@@ -23,8 +25,37 @@ static bool ctrdl_fileReadImpl(void* s, void* out, size_t size) {
     return true;
 }
 
+static bool ctrdl_memSeekImpl(void* s, size_t offset) {
+    CTRDLStream* stream = (CTRDLStream*)s;
+    if (offset <= stream->size) {
+        stream->offset = offset;
+        return true;
+    }
+
+    return false;
+}
+
+static bool ctrdl_memReadImpl(void* s, void* out, size_t size) {
+    CTRDLStream* stream = (CTRDLStream*)s;
+    if (size <= (stream->size - stream->offset)) {
+        memcpy(out, (void*)((u8*)(stream->handle) + stream->offset), size);
+        stream->offset += size;
+        return true;
+    }
+
+    return false;
+}
+
 void ctrdl_makeFileStream(CTRDLStream* stream, FILE* f) {
     stream->handle = (void*)f;
     stream->seek = ctrdl_fileSeekImpl;
     stream->read = ctrdl_fileReadImpl;
+}
+
+void ctrdl_makeMemStream(CTRDLStream* stream, const void* buffer, size_t size) {
+    stream->handle = (void*)buffer;
+    stream->seek = ctrdl_memSeekImpl;
+    stream->read = ctrdl_memReadImpl;
+    stream->size = 0;
+    stream->offset = 0;
 }

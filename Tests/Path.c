@@ -23,7 +23,7 @@ static void enumerateCallback(void* handle) {
     CTRDLInfo info;
     printf("Handle value: 0x%08lx\n", (u32)handle);
     if (ctrdlInfo(handle, &info)) {
-        printf("- Path: %s\n", info.path);
+        printf("- Path: %s\n", info.path ? info.path : "(UNKNOWN)");
         printf("- Base address: 0x%08lx\n", info.base);
         printf("- Size: 0x%08x\n", info.size);
         ctrdlFreeInfo(&info);

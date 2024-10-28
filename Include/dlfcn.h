@@ -3,6 +3,7 @@
 
 #include <3ds.h>
 #include <sys/types.h>
+#include <stdio.h>
 
 #define RTLD_LOCAL 0x0000
 #define RTLD_NOW 0x0002
@@ -36,7 +37,9 @@ void* dlsym(void* handle, const char* name);
 int dladdr(const void* addr, Dl_info* info);
 const char* dlerror(void);
 
-void* ctrdlOpen(const char* path, int flags, CTRDLResolverFn resolver, void* userData);
+void* ctrdlOpen(const char* path, int flags, CTRDLResolverFn resolver, void* resolverUserData);
+void* ctrdlFOpen(FILE* f, int flags, CTRDLResolverFn resolver, void* resolverUserData);
+void* ctrdlMap(const void* buffer, size_t size, int flags, CTRDLResolverFn resolver, void* resolverUserData);
 void* ctrdlHandleByAddress(u32 addr);
 void* ctrdlThisHandle(void);
 void ctrdlEnumerate(CTRDLEnumerateFn callback);
