@@ -9,7 +9,7 @@ typedef void (*DoMathFn)(int, int);
 
 static void stub() {}
 
-static void *resolver(const char *sym, void* unused) {
+static void* resolver(const char* sym, void* unused) {
     if (!strcmp(sym, "puts"))
         return puts;
         
@@ -32,7 +32,7 @@ static void enumerateCallback(void* handle) {
     }
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
     

@@ -11,7 +11,7 @@
 typedef void(*InitFiniFn)();
 
 typedef struct {
-    char *path;                 // Object path.
+    char* path;                 // Object path.
     u32 base;                   // Mirror address of mapped region.
     u32 origin;                 // Original address of mapped region.
     size_t size;                // Size of mapped region.
