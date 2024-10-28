@@ -21,44 +21,43 @@ static u32 ctrdl_resolveSymbol(const RelContext* ctx, Elf32_Word index) {
     if (index == STN_UNDEF)
         return 0;
 
-    const char* sym = ctrdl_getELFStringByIndex(ctx->elf, index);
+    const char* name = &ctx->elf->stringTable[ctx->elf->symEntries[index].st_name];
 
     // If we have a resolver, use it first.
     if (ctx->resolver) {
-        u32 addr = (u32)ctx->resolver(sym, ctx->resolverUserData);
+        u32 addr = (u32)ctx->resolver(name, ctx->resolverUserData);
         if (addr)
             return addr;
     }
 
     // Look into global objects.
-    u32 addr = 0;
+    const Elf32_Sym* sym = NULL;
     ctrdl_acquireHandleMtx();
 
     for (size_t i = 0; i < CTRDL_MAX_HANDLES; ++i) {
         CTRDLHandle* h = ctrdl_unsafeGetHandleByIndex(i);
         if (h->refc && (h->flags & RTLD_GLOBAL)) {
-            addr = ctrdl_findSymbolValueInHandle(h, sym);
-            if (addr)
+            sym = ctrdl_findSymbolFromName(h, name);
+            if (sym)
                 break;
         }
     }
 
     ctrdl_releaseHandleMtx();
 
-    if (addr)
-        return addr;
-
-    // Look into dependencies.
-    for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
-        CTRDLHandle* dep = ctx->handle->deps[i];
-        if (dep && !(dep->flags & RTLD_GLOBAL)) {
-            addr = ctrdl_findSymbolValueInHandle(dep, sym);
-            if (addr)
-                return addr;
+    if (!sym) {
+        // Look into dependencies.
+        for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i) {
+            CTRDLHandle* dep = ctx->handle->deps[i];
+            if (dep && !(dep->flags & RTLD_GLOBAL)) {
+                sym = ctrdl_findSymbolFromName(dep, name);
+                if (sym)
+                    break;
+            }
         }
     }
 
-    return 0;
+    return sym ? (ctx->handle->base + sym->st_value) : 0;
 }
 
 static bool ctrdl_handleSingleReloc(RelContext* ctx, RelEntry* entry) {

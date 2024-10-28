@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-Elf32_Word ctrdl_getELFSymHash(const char* name) {
+Elf32_Word ctrdl_getELFSymNameHash(const char* name) {
     Elf32_Word h = 0;
     Elf32_Word g = 0;
 
@@ -125,8 +125,7 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
         return false;
     }
 
-    Elf32_Word numChains;
-    if (!stream->read(stream, &numChains, sizeof(Elf32_Word))) {
+    if (!stream->read(stream, &out->numOfSymChains, sizeof(Elf32_Word))) {
         ctrdl_setLastError(Err_ReadFailed);
         ctrdl_freeELF(out);
         return false;
@@ -139,7 +138,7 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
         return false;
     }
 
-    out->symChains = malloc(numChains * sizeof(Elf32_Word));
+    out->symChains = malloc(out->numOfSymChains * sizeof(Elf32_Word));
     if (!out->symChains) {
         ctrdl_setLastError(Err_NoMemory);
         ctrdl_freeELF(out);
@@ -152,7 +151,7 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
         return false;
     }
 
-    if (!stream->read(stream, out->symChains, numChains * sizeof(Elf32_Word))) {
+    if (!stream->read(stream, out->symChains, out->numOfSymChains * sizeof(Elf32_Word))) {
         ctrdl_setLastError(Err_ReadFailed);
         ctrdl_freeELF(out);
         return false;
@@ -172,14 +171,14 @@ bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out) {
         return false;
     }
 
-    out->symEntries = malloc(numChains * sizeof(Elf32_Sym));
+    out->symEntries = malloc(out->numOfSymChains * sizeof(Elf32_Sym));
     if (!out->symEntries) {
         ctrdl_setLastError(Err_NoMemory);
         ctrdl_freeELF(out);
         return false;
     }
 
-    if (!stream->read(stream, out->symEntries, numChains * sizeof(Elf32_Sym))) {
+    if (!stream->read(stream, out->symEntries, out->numOfSymChains * sizeof(Elf32_Sym))) {
         ctrdl_setLastError(Err_ReadFailed);
         ctrdl_freeELF(out);
         return false;

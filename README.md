@@ -12,6 +12,5 @@ $DEVKITPRO/devkitARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.c
 
 ## Limitations
 
-- RTLD_LAZY, RTLD_DEEPBIND, and RTLD_NODELETE are not supported.
-- NULL pseudo path for main process is not supported.
-- (TODO) `dladdr` never fills `dli_sname` nor `dli_saddr`.
+- `RTLD_LAZY`, `RTLD_DEEPBIND`, and `RTLD_NODELETE` are not supported.
+- `NULL` pseudo path for main process is not supported.

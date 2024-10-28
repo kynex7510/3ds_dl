@@ -32,7 +32,7 @@ extern "C" {
 
 void* dlopen(const char* path, int flags);
 int dlclose(void* handle);
-void* dlsym(void* handle, const char* symbol);
+void* dlsym(void* handle, const char* name);
 int dladdr(const void* addr, Dl_info* info);
 const char* dlerror(void);
 

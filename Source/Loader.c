@@ -264,6 +264,7 @@ static bool ctrdl_mapObject(LdrData* ldrData) {
 
     handle->numSymBuckets = ldrData->elf.numOfSymBuckets;
     handle->symBuckets = ldrData->elf.symBuckets;
+    handle->numSymChains = ldrData->elf.numOfSymChains;
     handle->symChains = ldrData->elf.symChains;
     handle->symEntries = ldrData->elf.symEntries;
     handle->stringTable = ldrData->elf.stringTable;

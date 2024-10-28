@@ -22,6 +22,7 @@ typedef struct {
     size_t numOfFiniEntries;    // Number of fini functions.
     size_t numSymBuckets;       // Number of symbol buckets;
     Elf32_Word* symBuckets;     // Symbol buckets.
+    size_t numSymChains;        // Number of symbol chains (entries).
     Elf32_Word* symChains;      // Symbol chains.
     Elf32_Sym* symEntries;      // Symbol entries.
     char* stringTable;          // String table.

@@ -28,37 +28,43 @@ const char* dlerror(void) { return ctrdl_getErrorAsString(ctrdl_getLastError());
 
 int dlclose(void* handle) { return !ctrdl_unlockHandle((CTRDLHandle*)handle); }
 
-void* dlsym(void* handle, const char* symbol) {
-    if (!handle || !symbol) {
+void* dlsym(void* handle, const char* name) {
+    if (!handle || !name) {
         ctrdl_setLastError(Err_InvalidParam);
         return NULL;
     }
 
-    u32 addr = ctrdl_findSymbolValue((CTRDLHandle*)handle, symbol);
-    if (!addr)
-        ctrdl_setLastError(Err_NotFound);
+    CTRDLHandle* h = (CTRDLHandle*)handle;
+    const Elf32_Sym* sym = ctrdl_extendedFindSymbolFromName(h, name);
+    if (sym)
+        return (void*)(h->base + sym->st_value);
 
-    return (void*)addr;
+    ctrdl_setLastError(Err_NotFound);
+    return NULL;
 }
 
-int dladdr(const void* addr, Dl_info* info) {
+int dladdr(const void* address, Dl_info* info) {
     if (!info)
         return 0;
 
-    CTRDLHandle* h = ctrdlHandleByAddress((u32)addr);
+    const u32 addr = (u32)address;
+    CTRDLHandle* h = ctrdlHandleByAddress(addr);
     if (h) {
         info->dli_fname = h->path;
         info->dli_fbase = (void*)h->base;
-            
-        // TODO
-        info->dli_sname = NULL;
-        info->dli_saddr = NULL;
+
+        const Elf32_Sym* sym = ctrdl_findSymbolFromValue(h, addr - h->base);
+        if (sym) {
+            info->dli_sname = &h->stringTable[sym->st_name];
+            info->dli_saddr = (void*)(h->base + sym->st_value);
+        } else {
+            info->dli_sname = NULL;
+            info->dli_saddr = NULL;
+        }
 
         ctrdl_unlockHandle(h);
     }
 
-    // We dont have to provide error values for this function.
-    ctrdl_clearLastError();
     return info->dli_fbase != NULL;
 }
 

@@ -37,20 +37,19 @@ static CTRDLHandle* ctrdl_depQueuePop(DepQueue* q) {
     return NULL;
 }
 
-u32 ctrdl_findSymbolValueInHandle(CTRDLHandle* handle, const char* sym) {
-    u32 found = 0;
+const Elf32_Sym* ctrdl_findSymbolFromName(CTRDLHandle* handle, const char* name) {
+    const Elf32_Sym* found = NULL;
 
     if (handle) {
         ctrdl_lockHandle(handle);
 
-        const Elf32_Word hash = ctrdl_getELFSymHash(sym);
+        const Elf32_Word hash = ctrdl_getELFSymNameHash(name);
         size_t chainIndex = handle->symBuckets[hash % handle->numSymBuckets];
 
         while (chainIndex != STN_UNDEF) {
-            const Elf32_Sym* s = &handle->symEntries[chainIndex];
-            const char* name = &handle->stringTable[s->st_name];
-            if (!strcmp(name, sym)) {
-                found = handle->base + s->st_value;
+            const Elf32_Sym* sym = &handle->symEntries[chainIndex];
+            if (!strcmp(&handle->stringTable[sym->st_name], name)) {
+                found = sym;
                 break;
             }
 
@@ -63,31 +62,49 @@ u32 ctrdl_findSymbolValueInHandle(CTRDLHandle* handle, const char* sym) {
     return found;
 }
 
-static u32 ctrdl_findSymbolValueBreadthFirst(DepQueue* q, const char* sym) {
-    while (!ctrdl_depQueueIsEmpty(q)) {
-        CTRDLHandle* h = ctrdl_depQueuePop(q);
-        u32 addr = ctrdl_findSymbolValueInHandle(h, sym);
-        if (addr)
-            return addr;
-
-        for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i)
-            ctrdl_depQueuePush(q, h->deps[i]);
-    }
-
-    return 0;
-}
-
-u32 ctrdl_findSymbolValue(CTRDLHandle* handle, const char* sym) {
+const Elf32_Sym* ctrdl_extendedFindSymbolFromName(CTRDLHandle* handle, const char* name) {
     DepQueue q;
-    u32 addr = 0;
+    const Elf32_Sym* found = NULL;
 
     if (handle) {
         ctrdl_lockHandle(handle);
+
         ctrdl_depQueueInit(&q);
         ctrdl_depQueuePush(&q, handle);
-        addr = ctrdl_findSymbolValueBreadthFirst(&q, sym);
+
+        while (!ctrdl_depQueueIsEmpty(&q)) {
+            CTRDLHandle* h = ctrdl_depQueuePop(&q);
+            found = ctrdl_findSymbolFromName(h, name);
+            if (found)
+                break;
+
+            for (size_t i = 0; i < CTRDL_MAX_DEPS; ++i)
+                ctrdl_depQueuePush(&q, h->deps[i]);
+        }
+
         ctrdl_unlockHandle(handle);
     }
 
-    return addr;
+    return found;
+}
+
+const Elf32_Sym* ctrdl_findSymbolFromValue(CTRDLHandle* handle, Elf32_Word value) {
+    Elf32_Sym* found = NULL;
+
+    if (handle) {
+        ctrdl_lockHandle(handle);
+
+        for (size_t i = 0; i < handle->numSymChains; ++i) {
+            if (i == STN_UNDEF)
+                continue;
+
+            found = &handle->symEntries[i];
+            if ((found->st_value >= value) && (value < (found->st_value + found->st_size)))
+                break;
+        }
+
+        ctrdl_unlockHandle(handle);
+    }
+
+    return found;
 }

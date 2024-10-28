@@ -15,6 +15,7 @@ typedef struct {
     Elf32_Dyn* dynEntries;
     Elf32_Word numOfSymBuckets;
     Elf32_Word* symBuckets;
+    Elf32_Word numOfSymChains;
     Elf32_Word* symChains;
     Elf32_Sym* symEntries;
     char* stringTable;
@@ -24,7 +25,7 @@ typedef struct {
     size_t relaArraySize;
 } CTRDLElf;
 
-Elf32_Word ctrdl_getELFSymHash(const char* name);
+Elf32_Word ctrdl_getELFSymNameHash(const char* name);
 bool ctrdl_parseELF(CTRDLStream* stream, CTRDLElf* out);
 void ctrdl_freeELF(CTRDLElf* elf);
 
@@ -40,10 +41,6 @@ size_t ctrdl_getELFDynEntriesWithTag(CTRDLElf* elf, Elf32_Sword tag, Elf32_Dyn* 
 
 CTRL_INLINE bool ctrdl_getELFDynEntryWithTag(CTRDLElf* elf, Elf32_Sword tag, Elf32_Dyn* out) {
     return ctrdl_getELFDynEntriesWithTag(elf, tag, out, 1);
-}
-
-CTRL_INLINE const char* ctrdl_getELFStringByIndex(CTRDLElf* elf, Elf32_Word index) {
-    return &elf->stringTable[elf->symEntries[index].st_name];
 }
 
 #endif /* _CTRDL_ELFUTIL_H */

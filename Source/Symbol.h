@@ -3,7 +3,8 @@
 
 #include "Handle.h"
 
-u32 ctrdl_findSymbolValueInHandle(CTRDLHandle* handle, const char* sym);
-u32 ctrdl_findSymbolValue(CTRDLHandle* handle, const char* sym);
+const Elf32_Sym* ctrdl_findSymbolFromName(CTRDLHandle* handle, const char* name);
+const Elf32_Sym* ctrdl_extendedFindSymbolFromName(CTRDLHandle* handle, const char* name);
+const Elf32_Sym* ctrdl_findSymbolFromValue(CTRDLHandle* handle, Elf32_Word value);
 
 #endif /* _CTRDL_SYMBOL_H */
