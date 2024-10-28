@@ -121,7 +121,7 @@ void* ctrdlHandleByAddress(u32 addr) {
 
 void* ctrdlThisHandle(void) { return ctrdlHandleByAddress((u32)__builtin_extract_return_addr(__builtin_return_address(0))); }
 
-void ctrdlIterate(CTRDLIterateFn callback) {
+void ctrdlEnumerate(CTRDLEnumerateFn callback) {
     if (!callback) {
         ctrdl_setLastError(Err_InvalidParam);
         return;
@@ -147,7 +147,7 @@ bool ctrdlInfo(void* handle, CTRDLInfo* info) {
     CTRDLHandle* h = (CTRDLHandle*)handle;
     ctrdl_lockHandle(h);
 
-    bool err = false;
+    bool success = true;
     if (h->path) {
         info->pathSize = strlen(h->path);;
         info->path = malloc(info->pathSize + 1);
@@ -156,7 +156,7 @@ bool ctrdlInfo(void* handle, CTRDLInfo* info) {
             info->path[info->pathSize] = '\0';
         } else {
             ctrdl_setLastError(Err_NoMemory);
-            err = true;
+            success = false;
         }
     } else {
         info->path = NULL;
@@ -167,10 +167,10 @@ bool ctrdlInfo(void* handle, CTRDLInfo* info) {
     info->size = h->size;
 
     ctrdl_unlockHandle(h);
-    return err;
+    return success;
 }
 
-void ctrdlFreeExtInfo(CTRDLInfo* info) {
+void ctrdlFreeInfo(CTRDLInfo* info) {
     if (info)
         free(info->path);
 }

@@ -19,6 +19,19 @@ static void *resolver(const char *sym, void* unused) {
     return stub;
 }
 
+static void enumerateCallback(void* handle) {
+    CTRDLInfo info;
+    printf("Handle value: 0x%08lx\n", (u32)handle);
+    if (ctrdlInfo(handle, &info)) {
+        printf("- Path: %s\n", info.path);
+        printf("- Base address: 0x%08lx\n", info.base);
+        printf("- Size: 0x%08x\n", info.size);
+        ctrdlFreeInfo(&info);
+    } else {
+        printf("ctrdlInfo() failed: %s\n", dlerror());
+    }
+}
+
 int main(int argc, char *argv[]) {
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
@@ -29,6 +42,8 @@ int main(int argc, char *argv[]) {
     void* h = ctrdlOpen("sdmc:/Math.so", RTLD_NOW, resolver, NULL);
     if (!h)
         goto fail;
+
+    ctrdlEnumerate(enumerateCallback);
 
     printf("Looking for symbol...\n");
     DoMathFn doMath = (DoMathFn)dlsym(h, "doMath");

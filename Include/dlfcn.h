@@ -10,7 +10,7 @@
 #define RTLD_GLOBAL 0x0100
 
 typedef void*(*CTRDLResolverFn)(const char* sym, void* userData);
-typedef void(CTRDLIterateFn)(void* handle);
+typedef void(*CTRDLEnumerateFn)(void* handle);
 
 typedef struct {
     const char* dli_fname; // Object path.
@@ -39,7 +39,7 @@ const char* dlerror(void);
 void* ctrdlOpen(const char* path, int flags, CTRDLResolverFn resolver, void* userData);
 void* ctrdlHandleByAddress(u32 addr);
 void* ctrdlThisHandle(void);
-void ctrdlIterate(CTRDLIterateFn callback);
+void ctrdlEnumerate(CTRDLEnumerateFn callback);
 bool ctrdlInfo(void* handle, CTRDLInfo* info);
 void ctrdlFreeInfo(CTRDLInfo* info);
 
