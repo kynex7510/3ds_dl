@@ -89,7 +89,7 @@ const Elf32_Sym* ctrdl_extendedFindSymbolFromName(CTRDLHandle* handle, const cha
 }
 
 const Elf32_Sym* ctrdl_findSymbolFromValue(CTRDLHandle* handle, Elf32_Word value) {
-    Elf32_Sym* found = NULL;
+    const Elf32_Sym* found = NULL;
 
     if (handle) {
         ctrdl_lockHandle(handle);
@@ -98,9 +98,11 @@ const Elf32_Sym* ctrdl_findSymbolFromValue(CTRDLHandle* handle, Elf32_Word value
             if (i == STN_UNDEF)
                 continue;
 
-            found = &handle->symEntries[i];
-            if ((found->st_value >= value) && (value < (found->st_value + found->st_size)))
+            const Elf32_Sym* sym = &handle->symEntries[i];
+            if ((sym->st_value >= value) && (value < (sym->st_value + sym->st_size))) {
+                found = sym;
                 break;
+            }
         }
 
         ctrdl_unlockHandle(handle);
