@@ -1,0 +1,27 @@
+name: Build CTRDL
+
+on:
+  push:
+    branches: [ main, ci ]
+  pull_request:
+    branches: [ main, ci ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: 'devkitpro/devkitarm'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure CMake
+        run: $DEVKITARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.cmake" -B ${{github.workspace}}/Build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      - name: Build
+        run: $DEVKITARM/bin/arm-none-eabi-cmake --build ${{github.workspace}}/Build --config ${{env.BUILD_TYPE}}

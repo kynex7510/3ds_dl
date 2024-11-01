@@ -7,7 +7,7 @@ This library provides an implementation of common `dl*` APIs along with custom a
 ```
 mkdir Build
 cd Build
-$DEVKITPRO/devkitARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.cmake" ..
+$DEVKITARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.cmake" ..
 ```
 
 ## Limitations
