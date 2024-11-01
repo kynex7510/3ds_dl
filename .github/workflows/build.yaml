@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - name: Configure CMake
-        run: $DEVKITARM/bin/arm-none-eabi-cmake --toolchain "$DEVKITPRO/cmake/3DS.cmake" -B ${{github.workspace}}/Build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        run: $DEVKITARM/bin/arm-none-eabi-cmake -B ${{github.workspace}}/Build -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/3DS.cmake" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
       - name: Build
         run: $DEVKITARM/bin/arm-none-eabi-cmake --build ${{github.workspace}}/Build --config ${{env.BUILD_TYPE}}
